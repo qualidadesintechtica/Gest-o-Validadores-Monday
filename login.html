@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Entrar | Gestão de Validadores</title>
+  <link rel="stylesheet" href="css/login.css">
+</head>
+<body>
+  <main class="login-shell">
+    <section class="login-brand">
+      <span>Operação Digital</span>
+      <h1>Gestão de Validadores</h1>
+      <p>Administração segura dos responsáveis pelas validações com atualização direta no Monday.</p>
+    </section>
+
+    <section class="login-card">
+      <h2>Entrar</h2>
+      <p>Use sua conta institucional autorizada.</p>
+
+      <form id="loginForm">
+        <label class="field">
+          <span>E-mail</span>
+          <input id="email" type="email" autocomplete="email" required placeholder="nome@animaeducacao.com.br">
+        </label>
+
+        <label class="field">
+          <span>Senha</span>
+          <input id="password" type="password" autocomplete="current-password" required placeholder="Sua senha">
+        </label>
+
+        <button id="entrarBtn" class="login-button" type="submit">Entrar</button>
+      </form>
+
+      <button id="resetSenha" class="login-link" type="button">Esqueci minha senha</button>
+      <div id="loginMensagem" class="login-message" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js"></script>
+  <script src="js/supabase.js"></script>
+  <script src="js/login.js"></script>
+</body>
+</html>

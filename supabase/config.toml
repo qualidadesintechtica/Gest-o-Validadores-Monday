@@ -1,0 +1,4 @@
+project_id = "nkjmgzyjjbepebzurowy"
+
+[functions.monday-responsaveis]
+verify_jwt = false

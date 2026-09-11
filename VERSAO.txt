@@ -1,0 +1,3 @@
+V1.0
+2026-09-11
+Projeto independente Gestão de Validadores Monday. Separado integralmente do BI-Monday.

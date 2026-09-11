@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Gestão de Validadores | Monday</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div class="gv-shell">
+    <aside class="gv-sidebar">
+      <div class="gv-brand">
+        <small>Operação Digital</small>
+        <strong>Gestão de Validadores</strong>
+        <span>Integração com Monday.com</span>
+      </div>
+
+      <div class="gv-note">
+        Ferramenta independente para administrar os responsáveis das validações diretamente no Monday.
+      </div>
+
+      <div class="gv-safe">
+        <strong>Alteração controlada</strong>
+        <span>Faça mudanças em um item por vez durante os testes iniciais.</span>
+      </div>
+    </aside>
+
+    <main class="gv-main">
+      <header class="gv-topbar">
+        <div>
+          <h1>Responsáveis pelas validações</h1>
+          <p>Altere Gestor de Validação e Revisor Validador diretamente no quadro do Monday.</p>
+        </div>
+        <div class="gv-user">
+          <span data-user-name>Usuário</span>
+          <button type="button" onclick="window.sairApp()">Sair</button>
+        </div>
+      </header>
+
+      <section class="gv-warning">
+        <strong>Ambiente operacional</strong>
+        <span>Ao confirmar em “Salvar no Monday”, a alteração é enviada imediatamente ao item selecionado.</span>
+      </section>
+
+      <section class="gv-toolbar">
+        <label>
+          Buscar item, grupo ou responsável
+          <input id="gvBusca" type="search" placeholder="Digite para localizar...">
+        </label>
+        <label>
+          Grupo
+          <select id="gvGrupo"><option value="">Todos os grupos</option></select>
+        </label>
+        <button id="gvAtualizar" class="gv-secondary" type="button">Atualizar dados</button>
+      </section>
+
+      <section class="gv-statusbar">
+        <div><span>Quadro</span><strong id="gvBoard">Carregando...</strong></div>
+        <div><span>Itens</span><strong id="gvTotal">0</strong></div>
+        <div><span>Exibidos</span><strong id="gvExibidos">0</strong></div>
+        <div><span>Status</span><strong id="gvStatus">Conectando...</strong></div>
+      </section>
+
+      <section class="gv-table-card">
+        <div class="gv-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Grupo</th>
+                <th>Item</th>
+                <th>Gestor de Validação</th>
+                <th>Revisor Validador</th>
+                <th>Ação</th>
+              </tr>
+            </thead>
+            <tbody id="gvTbody">
+              <tr><td colspan="5">Carregando dados do Monday...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <div id="gvToast" class="gv-toast" hidden></div>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js"></script>
+  <script src="js/supabase.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/gestao-validadores.js"></script>
+</body>
+</html>
