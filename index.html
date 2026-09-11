@@ -3,74 +3,116 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Gestão de Validadores | Monday</title>
+  <title>Gestão de Validadores | Operação Digital</title>
   <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
   <div class="gv-shell">
     <aside class="gv-sidebar">
-      <div class="gv-brand">
-        <small>Operação Digital</small>
-        <strong>Gestão de Validadores</strong>
-        <span>Integração com Monday.com</span>
+      <div class="gv-workspace-badge">OD</div>
+
+      <div class="gv-side-group">
+        <button class="gv-side-icon is-active" type="button" title="Gestão de Validadores" aria-label="Gestão de Validadores">
+          <span>▦</span>
+        </button>
+        <button class="gv-side-icon" type="button" title="Favoritos" aria-label="Favoritos">
+          <span>☆</span>
+        </button>
       </div>
 
-      <div class="gv-note">
-        Ferramenta independente para administrar os responsáveis das validações diretamente no Monday.
+      <div class="gv-side-bottom">
+        <button class="gv-side-icon" type="button" title="Ajuda" aria-label="Ajuda"><span>?</span></button>
+      </div>
+    </aside>
+
+    <aside class="gv-boardnav">
+      <div class="gv-boardnav-head">
+        <small>Workspace</small>
+        <strong>Operação Digital</strong>
       </div>
 
-      <div class="gv-safe">
+      <button class="gv-board-link is-active" type="button">
+        <span class="gv-board-link-icon">▦</span>
+        <span>Gestão de Validadores</span>
+      </button>
+
+      <div class="gv-boardnav-section">Integração</div>
+      <div class="gv-boardnav-help">
         <strong>Alteração controlada</strong>
-        <span>Faça mudanças em um item por vez durante os testes iniciais.</span>
+        <span>As mudanças confirmadas são enviadas diretamente para o Monday.</span>
       </div>
     </aside>
 
     <main class="gv-main">
       <header class="gv-topbar">
-        <div>
-          <h1>Responsáveis pelas validações</h1>
-          <p>Altere Gestor de Validação e Revisor Validador diretamente no quadro do Monday.</p>
+        <div class="gv-title-wrap">
+          <div class="gv-title-line">
+            <h1>Responsáveis pelas validações</h1>
+            <button class="gv-star" type="button" title="Favoritar">☆</button>
+          </div>
+          <p>Gerencie Gestor de Validação e Revisor Validador no quadro operacional.</p>
         </div>
+
         <div class="gv-user">
+          <div class="gv-user-avatar" data-user-avatar>LP</div>
           <span data-user-name>Usuário</span>
           <button type="button" onclick="window.sairApp()">Sair</button>
         </div>
       </header>
 
-      <section class="gv-warning">
-        <strong>Ambiente operacional</strong>
-        <span>Ao confirmar em “Salvar no Monday”, a alteração é enviada imediatamente ao item selecionado.</span>
-      </section>
+      <div class="gv-views">
+        <button type="button" class="gv-view-tab is-active">Quadro principal</button>
+      </div>
 
       <section class="gv-toolbar">
-        <label>
-          Buscar item, grupo ou responsável
-          <input id="gvBusca" type="search" placeholder="Digite para localizar...">
-        </label>
-        <label>
-          Grupo
-          <select id="gvGrupo"><option value="">Todos os grupos</option></select>
-        </label>
-        <button id="gvAtualizar" class="gv-secondary" type="button">Atualizar dados</button>
+        <div class="gv-toolbar-left">
+          <button class="gv-primary" id="gvAtualizar" type="button">Atualizar dados</button>
+
+          <label class="gv-searchbox">
+            <span>⌕</span>
+            <input id="gvBusca" type="search" placeholder="Buscar item, grupo ou responsável...">
+          </label>
+
+          <label class="gv-filter">
+            <span>Grupo</span>
+            <select id="gvGrupo"><option value="">Todos os grupos</option></select>
+          </label>
+        </div>
+
+        <div class="gv-live-note">
+          <span class="gv-live-dot"></span>
+          <span>Alterações enviadas ao Monday após confirmação</span>
+        </div>
       </section>
 
       <section class="gv-statusbar">
-        <div><span>Quadro</span><strong id="gvBoard">Carregando...</strong></div>
-        <div><span>Itens</span><strong id="gvTotal">0</strong></div>
-        <div><span>Exibidos</span><strong id="gvExibidos">0</strong></div>
-        <div><span>Status</span><strong id="gvStatus">Conectando...</strong></div>
+        <div class="gv-kpi">
+          <span>Quadro</span>
+          <strong id="gvBoard">Carregando...</strong>
+        </div>
+        <div class="gv-kpi"><span>Itens</span><strong id="gvTotal">0</strong></div>
+        <div class="gv-kpi"><span>Exibidos</span><strong id="gvExibidos">0</strong></div>
+        <div class="gv-kpi"><span>Status</span><strong id="gvStatus">Conectando...</strong></div>
       </section>
 
-      <section class="gv-table-card">
+      <section class="gv-board-card">
+        <div class="gv-board-headerline">
+          <div>
+            <h2>Quadro principal</h2>
+            <span>Responsáveis das validações</span>
+          </div>
+          <span class="gv-board-count" id="gvBoardCount">0 itens</span>
+        </div>
+
         <div class="gv-table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Grupo</th>
+                <th class="gv-col-group">Grupo</th>
                 <th>Item</th>
                 <th>Gestor de Validação</th>
                 <th>Revisor Validador</th>
-                <th>Ação</th>
+                <th class="gv-col-action">Ação</th>
               </tr>
             </thead>
             <tbody id="gvTbody">

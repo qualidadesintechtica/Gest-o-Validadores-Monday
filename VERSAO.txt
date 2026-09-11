@@ -1,3 +1,1 @@
-V1.0
-2026-09-11
-Projeto independente Gestão de Validadores Monday. Separado integralmente do BI-Monday.
+V1.1\n2026-09-11\nRedesign visual inspirado no Monday para a página Gestão de Validadores, preservando a lógica de integração.

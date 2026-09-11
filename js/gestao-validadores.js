@@ -10,6 +10,14 @@
   }[c]));
   const norm = v => String(v ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 
+  const GROUP_COLORS = ["#579bfc", "#00c875", "#fdab3d", "#a25ddc", "#e2445c", "#0086c0", "#cab641", "#784bd1"];
+
+  function groupColor(name) {
+    let hash = 0;
+    for (const ch of String(name || "")) hash = ((hash << 5) - hash + ch.charCodeAt(0)) | 0;
+    return GROUP_COLORS[Math.abs(hash) % GROUP_COLORS.length];
+  }
+
   function toast(msg, error = false) {
     const el = $("gvToast");
     el.textContent = msg;
@@ -75,29 +83,56 @@
   function render() {
     const rows = filtrar();
     $("gvExibidos").textContent = rows.length.toLocaleString("pt-BR");
+    const count = $("gvBoardCount");
+    if (count) count.textContent = `${rows.length.toLocaleString("pt-BR")} ${rows.length === 1 ? "item" : "itens"}`;
     const tbody = $("gvTbody");
 
-    tbody.innerHTML = rows.slice(0, 300).map(item => {
-      const gid = currentId(item.gestor_people);
-      const rid = currentId(item.revisor_people);
-      return `
-        <tr data-id="${esc(item.id)}" data-g0="${esc(gid)}" data-r0="${esc(rid)}">
-          <td>${esc(item.group_title)}</td>
-          <td>
-            <span class="gv-item-name">${esc(item.name)}</span>
-            <span class="gv-current">ID ${esc(item.id)}</span>
+    const limited = rows.slice(0, 300);
+    const grupos = new Map();
+    limited.forEach(item => {
+      const key = item.group_title || "Sem grupo";
+      if (!grupos.has(key)) grupos.set(key, []);
+      grupos.get(key).push(item);
+    });
+
+    const html = [];
+    grupos.forEach((items, grupo) => {
+      const color = groupColor(grupo);
+      html.push(`
+        <tr class="gv-group-row" style="--group-color:${color}">
+          <td colspan="5">
+            <div class="gv-group-title">
+              <span class="gv-group-dot"></span>
+              <span>${esc(grupo)}</span>
+              <span class="gv-group-count">${items.length.toLocaleString("pt-BR")} ${items.length === 1 ? "item" : "itens"}</span>
+            </div>
           </td>
-          <td>
-            <select class="gv-row-select gv-gestor">${userOptions(gid)}</select>
-            <span class="gv-current">Atual: ${esc(item.gestor_text || "Sem responsável")}</span>
-          </td>
-          <td>
-            <select class="gv-row-select gv-revisor">${userOptions(rid)}</select>
-            <span class="gv-current">Atual: ${esc(item.revisor_text || "Sem responsável")}</span>
-          </td>
-          <td><button type="button" class="gv-save" disabled>Salvar no Monday</button></td>
-        </tr>`;
-    }).join("") || '<tr><td colspan="5">Nenhum item encontrado.</td></tr>';
+        </tr>`);
+
+      items.forEach(item => {
+        const gid = currentId(item.gestor_people);
+        const rid = currentId(item.revisor_people);
+        html.push(`
+          <tr class="gv-data-row" style="--group-color:${color}" data-id="${esc(item.id)}" data-g0="${esc(gid)}" data-r0="${esc(rid)}">
+            <td class="gv-group-cell">${esc(item.group_title || "Sem grupo")}</td>
+            <td>
+              <span class="gv-item-name">${esc(item.name)}</span>
+              <span class="gv-current">ID ${esc(item.id)}</span>
+            </td>
+            <td>
+              <select class="gv-row-select gv-gestor">${userOptions(gid)}</select>
+              <span class="gv-current">Atual: ${esc(item.gestor_text || "Sem responsável")}</span>
+            </td>
+            <td>
+              <select class="gv-row-select gv-revisor">${userOptions(rid)}</select>
+              <span class="gv-current">Atual: ${esc(item.revisor_text || "Sem responsável")}</span>
+            </td>
+            <td><button type="button" class="gv-save" disabled>Salvar no Monday</button></td>
+          </tr>`);
+      });
+    });
+
+    tbody.innerHTML = html.join("") || '<tr><td colspan="5">Nenhum item encontrado.</td></tr>';
 
     if (rows.length > 300) {
       tbody.insertAdjacentHTML(
@@ -192,6 +227,13 @@
   document.addEventListener("DOMContentLoaded", async () => {
     const user = await window.protegerPagina();
     if (!user) return;
+
+    const avatar = document.querySelector("[data-user-avatar]");
+    if (avatar) {
+      const nome = document.querySelector("[data-user-name]")?.textContent || user?.email || "U";
+      const partes = String(nome).trim().split(/\s+/).filter(Boolean);
+      avatar.textContent = ((partes[0]?.[0] || "U") + (partes.length > 1 ? partes[partes.length - 1][0] : "")).toUpperCase();
+    }
 
     $("gvBusca").addEventListener("input", render);
     $("gvGrupo").addEventListener("change", render);
