@@ -2,7 +2,16 @@
   "use strict";
 
   const BOARD_ID = Number(window.APP_CONFIG.BOARD_ID);
-  let state = { items: [], users: [], columns: null, board: null };
+  const GROUP_PAGE_SIZE = 30;
+  let state = {
+    items: [],
+    users: [],
+    sortedUsers: [],
+    columns: null,
+    board: null,
+    collapsedGroups: new Set(),
+    groupLimits: new Map()
+  };
 
   const $ = id => document.getElementById(id);
   const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({
@@ -13,6 +22,16 @@
   const GROUP_COLORS = ["#579bfc", "#00c875", "#fdab3d", "#a25ddc", "#e2445c", "#0086c0", "#cab641", "#784bd1"];
 
   function groupColor(name) {
+    const normalized = norm(name);
+    if (normalized.startsWith("a liberar")) return "#c4c4c4";
+    if (normalized.includes("liberado para validacao")) return "#fdab3d";
+    if (normalized.includes("revalid")) return "#ff642e";
+    if (normalized.includes("em ajuste")) return "#579bfc";
+    if (normalized.includes("validado")) return "#00c875";
+    if (normalized.includes("pausado")) return "#e2445c";
+    if (normalized.includes("aguardando")) return "#a25ddc";
+    if (normalized.includes("emailed")) return "#0086c0";
+
     let hash = 0;
     for (const ch of String(name || "")) hash = ((hash << 5) - hash + ch.charCodeAt(0)) | 0;
     return GROUP_COLORS[Math.abs(hash) % GROUP_COLORS.length];
@@ -90,13 +109,13 @@
 
   function userOptions(selectedId) {
     const base = ['<option value="">Sem responsável</option>'];
-    state.users
-      .slice()
-      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
-      .forEach(u => {
+    state.sortedUsers.forEach(u => {
+        const name = String(u.name || "").trim();
+        const email = String(u.email || "").trim();
+        const label = email && norm(name) !== norm(email) ? `${name} · ${email}` : (name || email);
         base.push(
           `<option value="${esc(u.id)}" ${String(selectedId) === String(u.id) ? "selected" : ""}>` +
-          `${esc(u.name)}${u.email ? ` · ${esc(u.email)}` : ""}</option>`
+          `${esc(label)}</option>`
         );
       });
     return base.join("");
@@ -120,11 +139,10 @@
     $("gvExibidos").textContent = rows.length.toLocaleString("pt-BR");
     const count = $("gvBoardCount");
     if (count) count.textContent = `${rows.length.toLocaleString("pt-BR")} ${rows.length === 1 ? "item" : "itens"}`;
-    const tbody = $("gvTbody");
+    const content = $("gvBoardContent");
 
-    const limited = rows.slice(0, 300);
     const grupos = new Map();
-    limited.forEach(item => {
+    rows.forEach(item => {
       const key = item.group_title || "Sem grupo";
       if (!grupos.has(key)) grupos.set(key, []);
       grupos.get(key).push(item);
@@ -133,24 +151,37 @@
     const html = [];
     grupos.forEach((items, grupo) => {
       const color = groupColor(grupo);
-      html.push(`
-        <tr class="gv-group-row" style="--group-color:${color}">
-          <td colspan="5">
-            <div class="gv-group-title">
-              <span class="gv-group-dot"></span>
-              <span>${esc(grupo)}</span>
-              <span class="gv-group-count">${items.length.toLocaleString("pt-BR")} ${items.length === 1 ? "item" : "itens"}</span>
-            </div>
-          </td>
-        </tr>`);
+      const collapsed = state.collapsedGroups.has(grupo);
+      const limit = state.groupLimits.get(grupo) || GROUP_PAGE_SIZE;
+      const visibleItems = items.slice(0, limit);
+      const remaining = Math.max(0, items.length - visibleItems.length);
 
-      items.forEach(item => {
+      html.push(`
+        <section class="gv-monday-group" style="--group-color:${color}" data-group="${esc(grupo)}">
+          <button class="gv-group-toggle" type="button" data-group="${esc(grupo)}" aria-expanded="${collapsed ? "false" : "true"}">
+            <span class="gv-group-chevron ${collapsed ? "is-collapsed" : ""}">⌄</span>
+            <span class="gv-group-title">${esc(grupo)}</span>
+            <span class="gv-group-count">${items.length.toLocaleString("pt-BR")} ${items.length === 1 ? "item" : "itens"}</span>
+          </button>
+          <div class="gv-group-body ${collapsed ? "is-collapsed" : ""}">
+            <div class="gv-group-table-scroll">
+              <table class="gv-group-table">
+                <thead>
+                  <tr>
+                    <th class="gv-col-item">Item</th>
+                    <th>Gestor de Validação</th>
+                    <th>Revisor Validador</th>
+                    <th class="gv-col-action">Ação</th>
+                  </tr>
+                </thead>
+                <tbody>`);
+
+      visibleItems.forEach(item => {
         const gid = currentId(item.gestor_people);
         const rid = currentId(item.revisor_people);
         html.push(`
-          <tr class="gv-data-row" style="--group-color:${color}" data-id="${esc(item.id)}" data-g0="${esc(gid)}" data-r0="${esc(rid)}">
-            <td class="gv-group-cell">${esc(item.group_title || "Sem grupo")}</td>
-            <td>
+          <tr class="gv-data-row" data-id="${esc(item.id)}" data-g0="${esc(gid)}" data-r0="${esc(rid)}">
+            <td class="gv-item-cell">
               <span class="gv-item-name">${esc(item.name)}</span>
               <span class="gv-current">ID ${esc(item.id)}</span>
             </td>
@@ -165,16 +196,27 @@
             <td><button type="button" class="gv-save" disabled>Salvar no Monday</button></td>
           </tr>`);
       });
+
+      html.push(`
+                </tbody>
+              </table>
+            </div>`);
+
+      if (remaining > 0) {
+        const next = Math.min(items.length, limit + GROUP_PAGE_SIZE);
+        html.push(`
+            <button class="gv-show-more" type="button" data-group="${esc(grupo)}" data-next="${next}">
+              Mostrar mais ${Math.min(GROUP_PAGE_SIZE, remaining).toLocaleString("pt-BR")}
+              <span>${visibleItems.length.toLocaleString("pt-BR")} de ${items.length.toLocaleString("pt-BR")}</span>
+            </button>`);
+      }
+
+      html.push(`
+          </div>
+        </section>`);
     });
 
-    tbody.innerHTML = html.join("") || '<tr><td colspan="5">Nenhum item encontrado.</td></tr>';
-
-    if (rows.length > 300) {
-      tbody.insertAdjacentHTML(
-        "beforeend",
-        `<tr><td colspan="5">Mostrando os primeiros 300 de ${rows.length.toLocaleString("pt-BR")} itens. Refine a busca.</td></tr>`
-      );
-    }
+    content.innerHTML = html.join("") || '<div class="gv-empty">Nenhum item encontrado.</div>';
   }
 
   function renderGrupos() {
@@ -201,7 +243,12 @@
       if (!p.board?.id || !Array.isArray(p.items) || !Array.isArray(p.users) || !p.columns?.gestor || !p.columns?.revisor) {
         throw new Error("A integração retornou dados incompletos. Publique novamente a Edge Function.");
       }
-      state = p;
+      state = {
+        ...p,
+        sortedUsers: p.users.slice().sort((a, b) => String(a.name || a.email || "").localeCompare(String(b.name || b.email || ""), "pt-BR")),
+        collapsedGroups: new Set(),
+        groupLimits: new Map()
+      };
       $("gvBoard").textContent = `${p.board.name} · ${p.board.id}`;
       $("gvTotal").textContent = p.items.length.toLocaleString("pt-BR");
       $("gvStatus").textContent = "Conectado";
@@ -212,7 +259,7 @@
       $("gvStatus").textContent = "Erro";
       $("gvBoard").textContent = "Não carregado";
       const message = e?.message || "Falha inesperada ao carregar os dados.";
-      $("gvTbody").innerHTML = `<tr><td colspan="5">${esc(message)}</td></tr>`;
+      $("gvBoardContent").innerHTML = `<div class="gv-empty gv-empty-error">${esc(message)}</div>`;
       toast(message, true);
     } finally {
       $("gvAtualizar").disabled = false;
@@ -280,13 +327,35 @@
       avatar.textContent = ((partes[0]?.[0] || "U") + (partes.length > 1 ? partes[partes.length - 1][0] : "")).toUpperCase();
     }
 
-    $("gvBusca").addEventListener("input", render);
-    $("gvGrupo").addEventListener("change", render);
+    $("gvBusca").addEventListener("input", () => {
+      state.groupLimits = new Map();
+      render();
+    });
+    $("gvGrupo").addEventListener("change", () => {
+      state.groupLimits = new Map();
+      render();
+    });
     $("gvAtualizar").addEventListener("click", carregar);
-    $("gvTbody").addEventListener("change", e => {
+    $("gvBoardContent").addEventListener("change", e => {
       if (e.target.matches(".gv-row-select")) checkRow(e.target.closest("tr"));
     });
-    $("gvTbody").addEventListener("click", e => {
+    $("gvBoardContent").addEventListener("click", e => {
+      const toggle = e.target.closest(".gv-group-toggle");
+      if (toggle) {
+        const grupo = toggle.dataset.group;
+        if (state.collapsedGroups.has(grupo)) state.collapsedGroups.delete(grupo);
+        else state.collapsedGroups.add(grupo);
+        render();
+        return;
+      }
+
+      const more = e.target.closest(".gv-show-more");
+      if (more) {
+        state.groupLimits.set(more.dataset.group, Number(more.dataset.next) || GROUP_PAGE_SIZE);
+        render();
+        return;
+      }
+
       const b = e.target.closest(".gv-save");
       if (b) salvar(b.closest("tr"));
     });

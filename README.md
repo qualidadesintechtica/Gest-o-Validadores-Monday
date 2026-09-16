@@ -9,6 +9,8 @@ Aplicação independente do BI para alterar diretamente no Monday os responsáve
 - Consulta do quadro de Validação de Materiais no Monday.
 - Busca por item, grupo, gestor ou revisor.
 - Filtro por grupo.
+- Visão por grupos no padrão do quadro do Monday.
+- Grupos recolhíveis e carregamento progressivo de 30 itens.
 - Alteração de `Gestor de Validação`.
 - Alteração de `Revisor Validador`.
 - Confirmação antes da gravação.
@@ -44,7 +46,7 @@ Após publicar, confirme no painel do Supabase que a função aparece como
 
 ## Correção do erro de carregamento
 
-A versão V1.3 separa as etapas de leitura do quadro, responsáveis e itens. Assim,
+A versão V1.4 separa as etapas de leitura do quadro, responsáveis e itens. Assim,
 um problema de token, permissão, coluna ou paginação aparece com uma mensagem
 identificável em vez de um código hexadecimal isolado.
 
