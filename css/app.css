@@ -34,6 +34,7 @@ body{
 }
 button,input,select{font:inherit}
 button{color:inherit}
+button,summary,select,input,label{pointer-events:auto}
 button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid #66b4ff;outline-offset:2px}
 
 /* faixa superior */
@@ -103,15 +104,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 .gv-nav-scroll{overflow:auto;padding:7px 13px 22px;scrollbar-color:#757a95 transparent;scrollbar-width:thin}
 .gv-nav-label,.gv-nav-heading{display:flex;justify-content:space-between;align-items:center;padding:8px;color:#c5c8d6;font-size:11px}
 .gv-nav-heading{margin-top:7px;color:#fff}
-.gv-nav-section{padding:10px 7px 5px;color:#aeb2c5;font-size:11px;letter-spacing:.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gv-nav-section{padding:10px 7px 5px;color:#aeb2c5;font-size:11px;letter-spacing:.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
 .gv-nav-section.is-green{color:#00d8a5}.gv-nav-section.is-blue{color:#69a7ff}.gv-nav-section.is-purple{color:#a97df0}
-.gv-nav-item{height:34px;padding:0 10px;display:flex;align-items:center;gap:7px;border-radius:4px;color:#acb0c2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px}
+.gv-nav-item{height:34px;padding:0 10px;display:flex;align-items:center;gap:7px;border-radius:4px;color:#acb0c2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px;cursor:pointer}
 .gv-nav-item span{flex:0 0 auto}
 .gv-nav-item:hover{background:#242a44;color:#fff}
 .gv-nav-item.is-active{background:#155a9a;color:#fff}
 
 /* cabeçalho do quadro */
-.gv-main{min-width:0;min-height:0;background:var(--page);padding:0 22px 16px;display:flex;flex-direction:column}
+.gv-main{min-width:0;min-height:0;background:var(--page);padding:0 22px 16px;display:flex;flex-direction:column;isolation:isolate}
 .gv-board-topbar{min-height:66px;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:11px 8px 7px}
 .gv-board-title{display:flex;align-items:flex-start;gap:10px;min-width:0}
 .gv-board-check{width:24px;height:24px;border-radius:3px;background:#8a5bd5;display:grid;place-items:center;font-size:16px;margin-top:2px}
@@ -138,6 +139,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 
 /* ferramentas */
 .gv-toolbar{min-height:58px;display:flex;align-items:center;gap:5px;padding:9px 4px;overflow:visible;flex:0 0 auto;position:relative;z-index:9}
+.gv-toolbar button,.gv-toolbar summary,.gv-toolbar select,.gv-toolbar input{position:relative;z-index:10}
 .gv-primary{height:36px;border:0;border-radius:4px;background:var(--monday-blue);color:#fff;padding:0 13px;font-weight:600;cursor:pointer;white-space:nowrap}
 .gv-primary:hover{background:var(--monday-blue-hover)}
 .gv-primary:disabled{opacity:.55;cursor:not-allowed}
@@ -171,10 +173,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 .gv-statusline span{display:flex;align-items:center;gap:5px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .gv-statusline strong{color:#e4e6ed;font-weight:600}
 .gv-live-dot{width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block}
+.gv-controls-dot{width:7px;height:7px;border-radius:50%;background:#66b4ff;display:inline-block;box-shadow:0 0 0 2px rgba(102,180,255,.15)}
+.gv-controls-status{color:#cbd7e8!important}
 .gv-sync-note{margin-left:auto}
 
 /* quadro e grupos */
-.gv-board-card{min-height:0;flex:1;position:relative;overflow:hidden;background:var(--page)}
+.gv-board-card{min-height:0;flex:1;position:relative;overflow:hidden;background:var(--page);z-index:1;pointer-events:auto}
 .gv-board-headerline{height:27px;display:flex;align-items:center;justify-content:flex-end;gap:12px;padding:0 9px;color:#898ea5;font-size:9px}
 .gv-board-headerline [data-user-name]{display:none}
 .gv-board-content{height:calc(100% - 27px);overflow:auto;padding:0 4px 54px 4px;scrollbar-color:#737993 #242941;scrollbar-width:thin}
@@ -206,6 +210,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 .gv-item-name{display:block;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
 .gv-current{display:block;margin-top:3px;color:#aeb2c4;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .gv-row-select{width:100%;min-width:170px;height:31px;border:1px solid #646b88;border-radius:3px;background:#272d48;color:#fff;padding:0 8px;outline:0;text-overflow:ellipsis}
+.gv-row-select,.gv-save,.gv-group-toggle,.gv-show-more{pointer-events:auto!important;position:relative;z-index:2}
 .gv-row-select:hover,.gv-row-select:focus{border-color:#7eb5ee;background:#222943}
 .gv-row-select option{background:#252a44;color:#fff}
 .gv-save{height:31px;width:100%;border:0;border-radius:3px;padding:0 10px;background:var(--monday-blue);color:#fff;font-weight:600;cursor:pointer;white-space:nowrap;font-size:11px}
