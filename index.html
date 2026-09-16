@@ -3,120 +3,213 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Gestão de Validadores | Operação Digital</title>
-  <link rel="stylesheet" href="css/app.css?v=20260916-v1.4">
+  <title>Validação de Materiais | Operação Digital</title>
+  <link rel="stylesheet" href="css/app.css?v=20260916-v1.5">
 </head>
 <body>
+  <div class="gv-noticebar">
+    <span>Gestão de Validadores conectada ao Monday</span>
+    <span class="gv-notice-status"><i></i> Alterações controladas e auditáveis</span>
+  </div>
+
+  <header class="gv-globalbar">
+    <div class="gv-global-brand">
+      <span class="gv-brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span class="gv-workspace-pill">Corporativo</span>
+    </div>
+    <label class="gv-global-search">
+      <span aria-hidden="true">⌕</span>
+      <input id="gvGlobalBusca" type="search" placeholder="Pesquise o que quiser..." aria-label="Pesquisar no quadro">
+    </label>
+    <div class="gv-global-actions">
+      <button type="button" title="Notificações" aria-label="Notificações">♧</button>
+      <button type="button" title="Ajuda" aria-label="Ajuda">?</button>
+      <button type="button" class="gv-app-grid" title="Aplicativos" aria-label="Aplicativos">⠿</button>
+      <div class="gv-global-avatar" data-user-avatar>LP</div>
+    </div>
+  </header>
+
   <div class="gv-shell">
-    <aside class="gv-sidebar">
-      <div class="gv-workspace-badge">OD</div>
-
+    <aside class="gv-sidebar" aria-label="Navegação principal">
       <div class="gv-side-group">
-        <button class="gv-side-icon is-active" type="button" title="Gestão de Validadores" aria-label="Gestão de Validadores">
-          <span>▦</span>
-        </button>
-        <button class="gv-side-icon" type="button" title="Favoritos" aria-label="Favoritos">
-          <span>☆</span>
-        </button>
+        <button class="gv-side-icon is-active" type="button" title="Área de trabalho"><span>▦</span><small>Área de trabalho</small></button>
+        <button class="gv-side-icon" type="button" title="Sidekick"><span>✦</span><small>Sidekick</small></button>
+        <button class="gv-side-icon" type="button" title="Agentes"><span>♧</span><small>Agentes</small></button>
+        <button class="gv-side-icon" type="button" title="Vibe"><span>♡</span><small>Vibe</small></button>
+        <button class="gv-side-icon" type="button" title="Fluxos de trabalho"><span>⌘</span><small>Fluxos</small></button>
+        <button class="gv-side-icon" type="button" title="Analisador"><span>≋</span><small>Analisar</small></button>
+        <button class="gv-side-icon" type="button" title="Favoritos"><span>☆</span><small>Favoritos</small></button>
       </div>
-
       <div class="gv-side-bottom">
-        <button class="gv-side-icon" type="button" title="Ajuda" aria-label="Ajuda"><span>?</span></button>
+        <button class="gv-side-icon" type="button" title="Mais"><span>•••</span><small>Mais</small></button>
       </div>
     </aside>
 
-    <aside class="gv-boardnav">
-      <div class="gv-boardnav-head">
-        <small>Workspace</small>
-        <strong>Operação Digital</strong>
+    <aside class="gv-boardnav" aria-label="Área de trabalho">
+      <div class="gv-boardnav-top">
+        <span>Área de trabalho</span>
+        <button type="button" aria-label="Opções da área de trabalho">•••</button>
+        <button type="button" aria-label="Pesquisar na área de trabalho">⌕</button>
+        <button type="button" aria-label="Recolher navegação">«</button>
+      </div>
+      <div class="gv-workspace-select">
+        <span class="gv-workspace-icon">☁</span>
+        <strong>Produção de Materiais</strong>
+        <span>⌄</span>
+        <button type="button" aria-label="Adicionar">＋</button>
       </div>
 
-      <button class="gv-board-link is-active" type="button">
-        <span class="gv-board-link-icon">▦</span>
-        <span>Gestão de Validadores</span>
-      </button>
+      <div class="gv-nav-scroll">
+        <div class="gv-nav-label">Meus agentes <span>›</span></div>
+        <div class="gv-nav-heading">Conteúdo <span>••• ＋</span></div>
+        <div class="gv-nav-item"><span>▦</span> Gerir área de trabalho</div>
 
-      <div class="gv-boardnav-section">Integração</div>
-      <div class="gv-boardnav-help">
-        <strong>Alteração controlada</strong>
-        <span>As mudanças confirmadas são enviadas diretamente para o Monday.</span>
+        <div class="gv-nav-section is-green"><span>⌄</span> PLANEJAMENTO</div>
+        <div class="gv-nav-item"><span>♧</span> 📌 Oferta para Produção</div>
+        <div class="gv-nav-item"><span>♧</span> 🖊 Contratação Conteudista</div>
+
+        <div class="gv-nav-section is-blue"><span>⌄</span> ESTEIRA DE PRODUÇÃO</div>
+        <div class="gv-nav-item"><span>♧</span> 🚀 Esteira de Produção</div>
+
+        <div class="gv-nav-section is-purple"><span>⌄</span> VALIDAÇÃO</div>
+        <div class="gv-nav-item is-active"><span>▣</span> ☑ Validação de Materiais</div>
+        <div class="gv-nav-item"><span>♧</span> Avaliação da Atuação</div>
+        <div class="gv-nav-item"><span>♧</span> Critérios de Avaliação</div>
+        <div class="gv-nav-item"><span>▣</span> ☑ Painéis de validação</div>
+        <div class="gv-nav-section"><span>›</span> PAINÉIS</div>
       </div>
     </aside>
 
     <main class="gv-main">
-      <header class="gv-topbar">
-        <div class="gv-title-wrap">
-          <div class="gv-title-line">
-            <h1>Responsáveis pelas validações</h1>
-            <button class="gv-star" type="button" title="Favoritar">☆</button>
+      <header class="gv-board-topbar">
+        <div class="gv-board-title">
+          <span class="gv-board-check">✓</span>
+          <div>
+            <div class="gv-title-line">
+              <h1>Validação de Materiais</h1>
+              <span class="gv-title-chevron">⌄</span>
+              <button class="gv-star" type="button" title="Favoritar">☆</button>
+            </div>
+            <p>Gestão de responsáveis pelas validações</p>
           </div>
-          <p>Gerencie Gestor de Validação e Revisor Validador no quadro operacional.</p>
         </div>
-
-        <div class="gv-user">
-          <div class="gv-user-avatar" data-user-avatar>LP</div>
-          <span data-user-name>Usuário</span>
-          <button type="button" onclick="window.sairApp()">Sair</button>
+        <div class="gv-board-actions">
+          <button type="button" title="Integrações">⇧</button>
+          <button type="button" title="Automatizações">♧</button>
+          <span class="gv-members"><i data-user-avatar>LP</i><i>OD</i></span>
+          <button class="gv-invite" type="button">Convidar</button>
+          <button type="button" title="Opções">•••</button>
+          <button class="gv-logout" type="button" onclick="window.sairApp()" title="Sair">Sair</button>
         </div>
       </header>
 
-      <div class="gv-views">
-        <button type="button" class="gv-view-tab is-active">Quadro principal</button>
-      </div>
+      <nav class="gv-views" aria-label="Visualizações do quadro">
+        <button type="button" class="gv-view-tab is-active" data-view="all">Quadro principal</button>
+        <button type="button" class="gv-view-tab" data-view="missing-gestor">Sem Gestor</button>
+        <button type="button" class="gv-view-tab" data-view="missing-revisor">Sem Revisor</button>
+        <button type="button" class="gv-view-tab" data-view="incomplete">Pendências</button>
+        <button type="button" class="gv-view-tab gv-view-add" title="Nova visualização">＋</button>
+      </nav>
 
-      <section class="gv-toolbar">
-        <div class="gv-toolbar-left">
-          <button class="gv-primary" id="gvAtualizar" type="button">Atualizar dados</button>
+      <section class="gv-toolbar" aria-label="Ferramentas do quadro">
+        <button class="gv-primary" id="gvCriar" type="button">Criar material <span>⌄</span></button>
 
-          <label class="gv-searchbox">
-            <span>⌕</span>
-            <input id="gvBusca" type="search" placeholder="Buscar item, grupo ou responsável...">
-          </label>
+        <label class="gv-tool-search">
+          <span>⌕</span>
+          <input id="gvBusca" type="search" placeholder="Pesquisar" aria-label="Pesquisar item, grupo ou responsável">
+        </label>
 
-          <label class="gv-filter">
-            <span>Grupo</span>
-            <select id="gvGrupo"><option value="">Todos os grupos</option></select>
-          </label>
-        </div>
+        <label class="gv-tool-control">
+          <span>◎</span><b>Pessoa</b>
+          <select id="gvPessoa" aria-label="Filtrar por pessoa"><option value="">Todas</option></select>
+        </label>
 
-        <div class="gv-live-note">
-          <span class="gv-live-dot"></span>
-          <span>Alterações enviadas ao Monday após confirmação</span>
-        </div>
+        <label class="gv-tool-control" id="gvFiltroControl">
+          <span>▽</span><b id="gvFiltroLabel">Filtro</b>
+          <select id="gvGrupo" aria-label="Filtrar por grupo"><option value="">Todos os grupos</option></select>
+        </label>
+
+        <label class="gv-tool-control">
+          <span>⇅</span><b id="gvOrdenarLabel">Ordenar</b>
+          <select id="gvOrdenar" aria-label="Ordenar itens">
+            <option value="board">Ordem do quadro</option>
+            <option value="name-asc">Item A–Z</option>
+            <option value="name-desc">Item Z–A</option>
+            <option value="group">Grupo A–Z</option>
+          </select>
+        </label>
+
+        <details class="gv-tool-menu" id="gvHideMenu">
+          <summary><span>◉</span><b id="gvOcultarLabel">Ocultar</b></summary>
+          <div class="gv-menu-popover">
+            <strong>Colunas visíveis</strong>
+            <label><input id="gvHideGestor" type="checkbox" checked> Gestor de Validação</label>
+            <label><input id="gvHideRevisor" type="checkbox" checked> Revisor Validador</label>
+            <label><input id="gvHideAcao" type="checkbox" checked> Ação</label>
+          </div>
+        </details>
+
+        <label class="gv-tool-control">
+          <span>▣</span><b>Agrupar por / 1</b>
+          <select id="gvAgrupar" aria-label="Agrupar itens">
+            <option value="group">Grupo do Monday</option>
+            <option value="none">Sem agrupamento</option>
+          </select>
+        </label>
+
+        <details class="gv-tool-menu gv-more-menu">
+          <summary aria-label="Mais opções">•••</summary>
+          <div class="gv-menu-popover is-right">
+            <button id="gvExpandir" type="button">Expandir todos os grupos</button>
+            <button id="gvRecolher" type="button">Recolher todos os grupos</button>
+            <button id="gvLimpar" type="button">Limpar filtros</button>
+            <button id="gvAtualizar" type="button">Atualizar dados do Monday</button>
+          </div>
+        </details>
       </section>
 
-      <section class="gv-statusbar">
-        <div class="gv-kpi">
-          <span>Quadro</span>
-          <strong id="gvBoard">Carregando...</strong>
-        </div>
-        <div class="gv-kpi"><span>Itens</span><strong id="gvTotal">0</strong></div>
-        <div class="gv-kpi"><span>Exibidos</span><strong id="gvExibidos">0</strong></div>
-        <div class="gv-kpi"><span>Status</span><strong id="gvStatus">Conectando...</strong></div>
+      <section class="gv-statusline" aria-label="Status da integração">
+        <span><i class="gv-live-dot"></i><strong id="gvStatus">Conectando...</strong></span>
+        <span id="gvBoard">Carregando...</span>
+        <span><strong id="gvTotal">0</strong> itens</span>
+        <span><strong id="gvExibidos">0</strong> exibidos</span>
+        <span class="gv-sync-note">Alterações são enviadas ao Monday após confirmação</span>
       </section>
 
       <section class="gv-board-card">
         <div class="gv-board-headerline">
-          <div>
-            <h2>Quadro principal</h2>
-            <span>Responsáveis das validações</span>
-          </div>
-          <span class="gv-board-count" id="gvBoardCount">0 itens</span>
+          <span id="gvBoardCount">0 itens</span>
+          <span data-user-name>Usuário</span>
         </div>
-
         <div class="gv-board-content" id="gvBoardContent">
           <div class="gv-loading">Carregando dados do Monday...</div>
         </div>
       </section>
+
+      <dialog id="gvCreateDialog" class="gv-dialog">
+        <form id="gvCreateForm">
+          <div class="gv-dialog-head">
+            <div><small>NOVO ITEM</small><h2>Criar material</h2></div>
+            <button type="button" id="gvCreateClose" aria-label="Fechar">×</button>
+          </div>
+          <label>Nome do material<input id="gvCreateName" type="text" required maxlength="255" autocomplete="off" placeholder="Digite o nome do material"></label>
+          <label>Grupo<select id="gvCreateGroup" required><option value="">Selecione um grupo</option></select></label>
+          <p>O material será criado diretamente no quadro do Monday.</p>
+          <div class="gv-dialog-actions">
+            <button type="button" id="gvCreateCancel">Cancelar</button>
+            <button class="gv-primary" id="gvCreateSubmit" type="submit">Criar no Monday</button>
+          </div>
+        </form>
+      </dialog>
 
       <div id="gvToast" class="gv-toast" hidden></div>
     </main>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/config.js?v=20260916-v1.4"></script>
-  <script src="js/supabase.js?v=20260916-v1.4"></script>
-  <script src="js/auth.js?v=20260916-v1.4"></script>
-  <script src="js/gestao-validadores.js?v=20260916-v1.4"></script>
+  <script src="js/config.js?v=20260916-v1.5"></script>
+  <script src="js/supabase.js?v=20260916-v1.5"></script>
+  <script src="js/auth.js?v=20260916-v1.5"></script>
+  <script src="js/gestao-validadores.js?v=20260916-v1.5"></script>
 </body>
 </html>

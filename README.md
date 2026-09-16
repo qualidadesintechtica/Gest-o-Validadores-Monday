@@ -2,15 +2,20 @@
 
 Aplicação independente do BI para alterar diretamente no Monday os responsáveis pelas validações.
 
-## Escopo V1
+## Escopo V1.5
 
 - Login via Supabase Auth.
 - Acesso restrito ao domínio `@animaeducacao.com.br`.
 - Consulta do quadro de Validação de Materiais no Monday.
-- Busca por item, grupo, gestor ou revisor.
-- Filtro por grupo.
-- Visão por grupos no padrão do quadro do Monday.
+- Visual escuro e compacto inspirado no quadro do Monday.
+- Abas de pendências por Gestor e Revisor.
+- Busca global por item, grupo, gestor ou revisor.
+- Filtros por grupo e por pessoa.
+- Ordenação por item ou grupo.
+- Opção de ocultar colunas.
+- Visão agrupada ou sem agrupamento.
 - Grupos recolhíveis e carregamento progressivo de 30 itens.
+- Criação de material no grupo escolhido.
 - Alteração de `Gestor de Validação`.
 - Alteração de `Revisor Validador`.
 - Confirmação antes da gravação.
@@ -44,11 +49,11 @@ supabase functions deploy monday-responsaveis --project-ref nkjmgzyjjbepebzurowy
 Após publicar, confirme no painel do Supabase que a função aparece como
 `monday-responsaveis` e consulte os logs caso a tela informe erro de integração.
 
-## Correção do erro de carregamento
+## Publicação da V1.5
 
-A versão V1.4 separa as etapas de leitura do quadro, responsáveis e itens. Assim,
-um problema de token, permissão, coluna ou paginação aparece com uma mensagem
-identificável em vez de um código hexadecimal isolado.
+A V1.5 mantém o carregamento seguro da V1.4 e adiciona a ação `create` na Edge
+Function. Por isso, publique novamente `monday-responsaveis` antes de usar o
+botão **Criar material**.
 
 Para substituir a versão contaminada, envie somente os arquivos deste pacote ao
 repositório `Gest-o-Validadores-Monday`. Não copie arquivos de outros projetos

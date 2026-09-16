@@ -180,6 +180,7 @@ async function bootstrap(boardId: number) {
       boards(ids: $boardId) {
         id
         name
+        groups { id title }
         columns { id title type }
       }
     }
@@ -289,7 +290,14 @@ async function bootstrap(boardId: number) {
 
   return {
     ok: true,
-    board: { id: String(board.id), name: board.name },
+    board: {
+      id: String(board.id),
+      name: board.name,
+      groups: (board.groups || []).map((group: any) => ({
+        id: String(group.id),
+        title: group.title,
+      })),
+    },
     columns: {
       gestor: { id: gestorCol.id, title: gestorCol.title },
       revisor: { id: revisorCol.id, title: revisorCol.title },
@@ -381,6 +389,61 @@ async function updateResponsaveis(boardId: number, body: any) {
   return { ok: true, item: data?.change_multiple_column_values };
 }
 
+async function createMaterial(boardId: number, body: any) {
+  const itemName = String(body?.item_name || "").replace(/\s+/g, " ").trim();
+  const groupId = String(body?.group_id || "").trim();
+
+  if (!itemName || itemName.length > 255) {
+    throw new AppError(
+      "Informe um nome de material com até 255 caracteres.",
+      400,
+      "INVALID_ITEM_NAME",
+    );
+  }
+  if (!/^[a-zA-Z0-9_-]{1,128}$/.test(groupId)) {
+    throw new AppError("Grupo inválido.", 400, "INVALID_GROUP_ID");
+  }
+
+  const groupsData = await monday(
+    `query ($boardId: [ID!]) { boards(ids: $boardId) { groups { id title } } }`,
+    { boardId: [String(boardId)] },
+    "validação do grupo",
+  );
+  const groups = groupsData?.boards?.[0]?.groups || [];
+  if (!groups.some((group: any) => String(group.id) === groupId)) {
+    throw new AppError(
+      "O grupo selecionado não existe neste quadro.",
+      422,
+      "GROUP_NOT_FOUND",
+    );
+  }
+
+  const mutation = `
+    mutation ($boardId: ID!, $groupId: String!, $itemName: String!) {
+      create_item(board_id: $boardId, group_id: $groupId, item_name: $itemName) {
+        id
+        name
+        group { id title }
+      }
+    }
+  `;
+  const data = await monday(
+    mutation,
+    { boardId: String(boardId), groupId, itemName },
+    "criação do material",
+  );
+
+  if (!data?.create_item?.id) {
+    throw new AppError(
+      "O Monday não confirmou a criação do material.",
+      502,
+      "CREATE_ITEM_FAILED",
+    );
+  }
+
+  return { ok: true, item: data.create_item };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") {
@@ -407,6 +470,7 @@ Deno.serve(async (req) => {
 
     if (action === "bootstrap") return json(await bootstrap(boardId));
     if (action === "update") return json(await updateResponsaveis(boardId, body));
+    if (action === "create") return json(await createMaterial(boardId, body));
     return json({ ok: false, error: "Ação inválida.", code: "INVALID_ACTION" }, 400);
   } catch (e) {
     console.error(e instanceof AppError ? { code: e.code, message: e.message } : e);
