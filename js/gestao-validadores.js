@@ -27,29 +27,64 @@
     toast.t = setTimeout(() => { el.hidden = true; }, 5000);
   }
 
+  function mensagemIntegracao(payload, status) {
+    const recebida = String(payload?.error || payload?.message || "").trim();
+
+    if (/^[a-f0-9]{48,}$/i.test(recebida)) {
+      return `A API do Monday devolveu uma falha interna (referência ${recebida.slice(0, 12)}…). ` +
+        "Verifique o token e os logs da função monday-responsaveis.";
+    }
+
+    if (recebida) return recebida;
+    if (status === 401) return "Sua sessão expirou ou não foi autorizada. Entre novamente.";
+    if (status === 404) return "A função monday-responsaveis não foi encontrada. Publique novamente a Edge Function.";
+    if (status >= 500) return "A integração com o Monday falhou no servidor. Consulte os logs da Edge Function.";
+    return `Não foi possível carregar os dados (HTTP ${status}).`;
+  }
+
   async function call(action, extra = {}) {
     const { data, error } = await window.appSupabase.auth.getSession();
     if (error || !data?.session?.access_token) {
       throw new Error("Sessão expirada. Entre novamente.");
     }
 
-    const res = await fetch(
-      `${window.APP_CONFIG.SUPABASE_URL}/functions/v1/monday-responsaveis`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${data.session.access_token}`,
-          apikey: window.APP_CONFIG.SUPABASE_PUBLISHABLE_KEY
-        },
-        body: JSON.stringify({ action, board_id: BOARD_ID, ...extra })
-      }
-    );
-
-    const payload = await res.json().catch(() => ({}));
-    if (!res.ok || payload?.ok === false) {
-      throw new Error(payload?.error || `Falha HTTP ${res.status}`);
+    let res;
+    try {
+      res = await fetch(
+        `${window.APP_CONFIG.SUPABASE_URL}/functions/v1/monday-responsaveis`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${data.session.access_token}`,
+            apikey: window.APP_CONFIG.SUPABASE_PUBLISHABLE_KEY
+          },
+          body: JSON.stringify({ action, board_id: BOARD_ID, ...extra })
+        }
+      );
+    } catch (error) {
+      console.error("Falha de rede ao chamar monday-responsaveis", error);
+      throw new Error("Não foi possível acessar a integração. Confira a publicação da Edge Function e a conexão.");
     }
+
+    const raw = await res.text();
+    let payload = null;
+    if (raw) {
+      try {
+        payload = JSON.parse(raw);
+      } catch (error) {
+        console.error("Resposta não JSON da integração", { status: res.status, error });
+      }
+    }
+
+    if (!res.ok || payload?.ok === false) {
+      throw new Error(mensagemIntegracao(payload, res.status));
+    }
+
+    if (!payload || typeof payload !== "object") {
+      throw new Error("A integração respondeu em um formato inválido. Publique novamente a Edge Function.");
+    }
+
     return payload;
   }
 
@@ -154,10 +189,18 @@
 
   async function carregar() {
     $("gvStatus").textContent = "Carregando...";
+    $("gvBoard").textContent = "Carregando...";
+    $("gvTotal").textContent = "0";
+    $("gvExibidos").textContent = "0";
+    const count = $("gvBoardCount");
+    if (count) count.textContent = "0 itens";
     $("gvAtualizar").disabled = true;
 
     try {
       const p = await call("bootstrap");
+      if (!p.board?.id || !Array.isArray(p.items) || !Array.isArray(p.users) || !p.columns?.gestor || !p.columns?.revisor) {
+        throw new Error("A integração retornou dados incompletos. Publique novamente a Edge Function.");
+      }
       state = p;
       $("gvBoard").textContent = `${p.board.name} · ${p.board.id}`;
       $("gvTotal").textContent = p.items.length.toLocaleString("pt-BR");
@@ -167,8 +210,10 @@
     } catch (e) {
       console.error(e);
       $("gvStatus").textContent = "Erro";
-      $("gvTbody").innerHTML = `<tr><td colspan="5">${esc(e.message)}</td></tr>`;
-      toast(e.message, true);
+      $("gvBoard").textContent = "Não carregado";
+      const message = e?.message || "Falha inesperada ao carregar os dados.";
+      $("gvTbody").innerHTML = `<tr><td colspan="5">${esc(message)}</td></tr>`;
+      toast(message, true);
     } finally {
       $("gvAtualizar").disabled = false;
     }
