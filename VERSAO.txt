@@ -1,3 +1,3 @@
-V1.5
+V1.5.1
 2026-09-16
-Visão de quadro no padrão Monday, com grupos coloridos, recolhimento, carregamento progressivo e colunas de Gestor e Revisor sem repetição do grupo em cada linha.
+Tema escuro no padrão Monday, controles interativos e correção de inicialização/cache do JavaScript.

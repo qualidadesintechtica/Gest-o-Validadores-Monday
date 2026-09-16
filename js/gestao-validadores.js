@@ -1,6 +1,8 @@
 (function () {
   "use strict";
 
+  window.GV_SCRIPT_LOADED = true;
+
   const BOARD_ID = Number(window.APP_CONFIG.BOARD_ID);
   const GROUP_PAGE_SIZE = 30;
   const GROUP_COLORS = ["#579bfc", "#00c875", "#fdab3d", "#a25ddc", "#e2445c", "#0086c0", "#cab641", "#784bd1"];
@@ -365,7 +367,20 @@
   }
 
   document.addEventListener("DOMContentLoaded", async () => {
-    const user = await window.protegerPagina();
+    let user;
+    try {
+      if (typeof window.protegerPagina !== "function") {
+        throw new Error("O módulo de autenticação não foi carregado. Atualize a pasta js completa.");
+      }
+      user = await window.protegerPagina();
+    } catch (error) {
+      console.error("Falha ao iniciar a interface", error);
+      const message = error?.message || "Não foi possível iniciar a interface.";
+      $("gvStatus").textContent = "Erro de inicialização";
+      $("gvBoardContent").innerHTML = `<div class="gv-empty gv-empty-error gv-startup-error">${esc(message)}</div>`;
+      toast(message, true);
+      return;
+    }
     if (!user) return;
 
     const name = document.querySelector("[data-user-name]")?.textContent || user?.email || "U";
@@ -438,6 +453,36 @@
       if (button) salvar(button.closest("tr"));
     });
 
+    document.querySelectorAll([
+      ".gv-global-actions button",
+      ".gv-side-icon",
+      ".gv-boardnav button",
+      ".gv-star",
+      ".gv-board-actions > button:not(.gv-logout)",
+      ".gv-view-add"
+    ].join(",")).forEach(button => {
+      button.addEventListener("click", () => {
+        if (button.classList.contains("gv-star")) {
+          const active = button.textContent.trim() === "★";
+          button.textContent = active ? "☆" : "★";
+          toast(active ? "Quadro removido dos favoritos." : "Quadro marcado como favorito nesta sessão.");
+          return;
+        }
+
+        const label = button.title || button.getAttribute("aria-label") || button.textContent.trim() || "Opção";
+        if (button.classList.contains("gv-invite")) {
+          toast("O acesso é controlado pelo login institucional do Supabase; convites não são enviados por esta tela.");
+          return;
+        }
+        if (button.classList.contains("gv-view-add")) {
+          toast("As quatro visualizações disponíveis já estão configuradas para a gestão de validadores.");
+          return;
+        }
+        toast(`${label}: este atalho pertence ao ambiente completo do Monday e não altera este aplicativo.`);
+      });
+    });
+
+    window.GV_APP_READY = true;
     carregar();
   });
 })();

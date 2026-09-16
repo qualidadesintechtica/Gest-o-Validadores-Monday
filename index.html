@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Validação de Materiais | Operação Digital</title>
-  <link rel="stylesheet" href="css/app.css?v=20260916-v1.5">
+  <link rel="stylesheet" href="css/app.css?v=20260916-v1.5.1">
 </head>
 <body>
   <div class="gv-noticebar">
@@ -207,9 +207,21 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/config.js?v=20260916-v1.5"></script>
-  <script src="js/supabase.js?v=20260916-v1.5"></script>
-  <script src="js/auth.js?v=20260916-v1.5"></script>
-  <script src="js/gestao-validadores.js?v=20260916-v1.5"></script>
+  <script src="js/config.js?v=20260916-v1.5.1"></script>
+  <script src="js/supabase.js?v=20260916-v1.5.1"></script>
+  <script src="js/auth.js?v=20260916-v1.5.1"></script>
+  <script src="js/gestao-validadores.js?v=20260916-v1.5.1"></script>
+  <script>
+    window.setTimeout(function () {
+      if (window.GV_APP_READY) return;
+      var status = document.getElementById("gvStatus");
+      var content = document.getElementById("gvBoardContent");
+      if (status) status.textContent = "Interface não iniciada";
+      if (content && !content.querySelector(".gv-startup-error")) {
+        content.innerHTML = '<div class="gv-empty gv-empty-error gv-startup-error">' +
+          'O JavaScript da aplicação não foi carregado. Confirme que a pasta <strong>js</strong> está na raiz do repositório e pressione Ctrl+F5.</div>';
+      }
+    }, 4000);
+  </script>
 </body>
 </html>
