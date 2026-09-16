@@ -2,7 +2,7 @@
 
 Aplicação independente do BI para alterar diretamente no Monday os responsáveis pelas validações.
 
-## Escopo V1.5.1
+## Escopo V1.6
 
 - Login via Supabase Auth.
 - Acesso restrito ao domínio `@animaeducacao.com.br`.
@@ -49,14 +49,14 @@ supabase functions deploy monday-responsaveis --project-ref nkjmgzyjjbepebzurowy
 Após publicar, confirme no painel do Supabase que a função aparece como
 `monday-responsaveis` e consulte os logs caso a tela informe erro de integração.
 
-## Publicação da V1.5
+## Publicação da V1.6
 
-A V1.5 mantém o carregamento seguro da V1.4 e adiciona a ação `create` na Edge
-Function. Por isso, publique novamente `monday-responsaveis` antes de usar o
-botão **Criar material**.
+A revisão V1.6 registra os controles antes do carregamento da autenticação,
+usa delegação de eventos para a tabela e torna toda a área dos filtros
+acionável. A linha de status deve mostrar **Controles V1.6 ativos**.
 
-A revisão V1.5.1 força o navegador a baixar o JavaScript atualizado e mostra um
-aviso claro caso a pasta `js` não esteja publicada na raiz do repositório.
+Esta atualização é somente do front-end. Não publique novamente a Edge Function
+se os itens do Monday já estão sendo carregados.
 
 Para substituir a versão contaminada, envie somente os arquivos deste pacote ao
 repositório `Gest-o-Validadores-Monday`. Não copie arquivos de outros projetos

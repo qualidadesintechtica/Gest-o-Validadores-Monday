@@ -362,31 +362,46 @@
   }
 
   function resetLimitsAndRender() {
+    if (!state.board) return;
     state.groupLimits = new Map();
     render();
   }
 
-  document.addEventListener("DOMContentLoaded", async () => {
-    let user;
-    try {
-      if (typeof window.protegerPagina !== "function") {
-        throw new Error("O módulo de autenticação não foi carregado. Atualize a pasta js completa.");
-      }
-      user = await window.protegerPagina();
-    } catch (error) {
-      console.error("Falha ao iniciar a interface", error);
-      const message = error?.message || "Não foi possível iniciar a interface.";
-      $("gvStatus").textContent = "Erro de inicialização";
-      $("gvBoardContent").innerHTML = `<div class="gv-empty gv-empty-error gv-startup-error">${esc(message)}</div>`;
-      toast(message, true);
-      return;
-    }
-    if (!user) return;
+  function abrirSeletor(id) {
+    const select = $(id);
+    if (!select) return;
+    const surface = select.closest(".gv-tool-control");
+    if (!surface) return;
 
-    const name = document.querySelector("[data-user-name]")?.textContent || user?.email || "U";
-    const parts = String(name).trim().split(/\s+/).filter(Boolean);
-    const initials = ((parts[0]?.[0] || "U") + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
-    document.querySelectorAll("[data-user-avatar]").forEach(avatar => { avatar.textContent = initials; });
+    surface.addEventListener("click", event => {
+      if (event.target === select || event.target.closest("select")) return;
+      event.preventDefault();
+      select.focus({ preventScroll: true });
+      try {
+        if (typeof select.showPicker === "function") select.showPicker();
+        else select.click();
+      } catch (_error) {
+        select.click();
+      }
+    });
+  }
+
+  function fecharMenuDoBotao(button) {
+    const details = button.closest("details");
+    if (details) details.open = false;
+  }
+
+  function bindStaticInteractions() {
+    if (window.GV_INTERACTIONS_BOUND) return;
+
+    const idsObrigatorios = [
+      "gvBusca", "gvGlobalBusca", "gvGrupo", "gvPessoa", "gvOrdenar", "gvAgrupar",
+      "gvHideGestor", "gvHideRevisor", "gvHideAcao", "gvCriar", "gvCreateDialog",
+      "gvCreateClose", "gvCreateCancel", "gvCreateForm", "gvAtualizar", "gvLimpar",
+      "gvExpandir", "gvRecolher", "gvBoardContent"
+    ];
+    const ausentes = idsObrigatorios.filter(id => !$(id));
+    if (ausentes.length) throw new Error(`Controles ausentes no HTML: ${ausentes.join(", ")}`);
 
     $("gvBusca").addEventListener("input", () => {
       $("gvGlobalBusca").value = $("gvBusca").value;
@@ -396,7 +411,10 @@
       $("gvBusca").value = $("gvGlobalBusca").value;
       resetLimitsAndRender();
     });
-    ["gvGrupo", "gvPessoa", "gvOrdenar", "gvAgrupar"].forEach(id => $(id).addEventListener("change", resetLimitsAndRender));
+    ["gvGrupo", "gvPessoa", "gvOrdenar", "gvAgrupar"].forEach(id => {
+      $(id).addEventListener("change", resetLimitsAndRender);
+      abrirSeletor(id);
+    });
     ["gvHideGestor", "gvHideRevisor", "gvHideAcao"].forEach(id => $(id).addEventListener("change", render));
 
     document.querySelectorAll("[data-view]").forEach(tab => tab.addEventListener("click", () => {
@@ -423,12 +441,18 @@
       state.view = "all";
       document.querySelectorAll("[data-view]").forEach(tab => tab.classList.toggle("is-active", tab.dataset.view === "all"));
       resetLimitsAndRender();
+      fecharMenuDoBotao($("gvLimpar"));
     });
-    $("gvExpandir").addEventListener("click", () => { state.collapsedGroups.clear(); render(); });
+    $("gvExpandir").addEventListener("click", () => {
+      state.collapsedGroups.clear();
+      render();
+      fecharMenuDoBotao($("gvExpandir"));
+    });
     $("gvRecolher").addEventListener("click", () => {
       const names = $("gvAgrupar").value === "none" ? ["Todos os itens"] : [...new Set(filtrar().map(item => item.group_title || "Sem grupo"))];
       state.collapsedGroups = new Set(names);
       render();
+      fecharMenuDoBotao($("gvRecolher"));
     });
 
     $("gvBoardContent").addEventListener("change", event => {
@@ -453,10 +477,23 @@
       if (button) salvar(button.closest("tr"));
     });
 
+    document.querySelectorAll(".gv-nav-item,.gv-nav-section").forEach(element => {
+      element.setAttribute("role", "button");
+      element.tabIndex = 0;
+      element.addEventListener("keydown", event => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          element.click();
+        }
+      });
+    });
+
     document.querySelectorAll([
       ".gv-global-actions button",
       ".gv-side-icon",
       ".gv-boardnav button",
+      ".gv-nav-item",
+      ".gv-nav-section",
       ".gv-star",
       ".gv-board-actions > button:not(.gv-logout)",
       ".gv-view-add"
@@ -478,11 +515,60 @@
           toast("As quatro visualizações disponíveis já estão configuradas para a gestão de validadores.");
           return;
         }
+        if (button.classList.contains("gv-nav-item") && button.classList.contains("is-active")) {
+          $("gvBoardContent").scrollTo({ top: 0, behavior: "smooth" });
+          toast("Quadro Validação de Materiais ativo.");
+          return;
+        }
         toast(`${label}: este atalho pertence ao ambiente completo do Monday e não altera este aplicativo.`);
       });
     });
 
+    document.addEventListener("keydown", event => {
+      if (event.key !== "Escape") return;
+      document.querySelectorAll("details[open]").forEach(details => { details.open = false; });
+      if ($("gvCreateDialog").open) $("gvCreateDialog").close();
+    });
+
+    window.GV_INTERACTIONS_BOUND = true;
     window.GV_APP_READY = true;
+    if ($("gvControlsStatus")) $("gvControlsStatus").textContent = "Controles V1.6 ativos";
+  }
+
+  document.addEventListener("DOMContentLoaded", async () => {
+    try {
+      bindStaticInteractions();
+    } catch (error) {
+      console.error("Falha ao registrar os controles", error);
+      const message = error?.message || "Não foi possível ativar os controles da interface.";
+      $("gvStatus").textContent = "Erro de controles";
+      if ($("gvControlsStatus")) $("gvControlsStatus").textContent = "Controles indisponíveis";
+      $("gvBoardContent").innerHTML = `<div class="gv-empty gv-empty-error gv-startup-error">${esc(message)}</div>`;
+      toast(message, true);
+      return;
+    }
+
+    let user;
+    try {
+      if (typeof window.protegerPagina !== "function") {
+        throw new Error("O módulo de autenticação não foi carregado. Atualize a pasta js completa.");
+      }
+      user = await window.protegerPagina();
+    } catch (error) {
+      console.error("Falha ao iniciar a interface", error);
+      const message = error?.message || "Não foi possível iniciar a interface.";
+      $("gvStatus").textContent = "Erro de inicialização";
+      $("gvBoardContent").innerHTML = `<div class="gv-empty gv-empty-error gv-startup-error">${esc(message)}</div>`;
+      toast(message, true);
+      return;
+    }
+    if (!user) return;
+
+    const name = document.querySelector("[data-user-name]")?.textContent || user?.email || "U";
+    const parts = String(name).trim().split(/\s+/).filter(Boolean);
+    const initials = ((parts[0]?.[0] || "U") + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
+    document.querySelectorAll("[data-user-avatar]").forEach(avatar => { avatar.textContent = initials; });
+
     carregar();
   });
 })();

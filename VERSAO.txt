@@ -1,3 +1,3 @@
-V1.5.1
+V1.6
 2026-09-16
-Tema escuro no padrão Monday, controles interativos e correção de inicialização/cache do JavaScript.
+Eventos registrados antes da autenticação, cliques por delegação e áreas completas dos filtros acionáveis.
