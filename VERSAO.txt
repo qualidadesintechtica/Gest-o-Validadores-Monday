@@ -1,1 +1,3 @@
-V1.1\n2026-09-11\nRedesign visual inspirado no Monday para a página Gestão de Validadores, preservando a lógica de integração.
+V1.3
+2026-09-16
+Restauração do projeto correto após mistura com arquivos da LiS Beauty, melhoria dos diagnósticos da integração e validação segura do quadro e das colunas antes da gravação no Monday.

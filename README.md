@@ -39,6 +39,19 @@ O ambiente do Supabase normalmente já fornece `SUPABASE_URL` e `SUPABASE_ANON_K
 supabase functions deploy monday-responsaveis --project-ref nkjmgzyjjbepebzurowy
 ```
 
+Após publicar, confirme no painel do Supabase que a função aparece como
+`monday-responsaveis` e consulte os logs caso a tela informe erro de integração.
+
+## Correção do erro de carregamento
+
+A versão V1.3 separa as etapas de leitura do quadro, responsáveis e itens. Assim,
+um problema de token, permissão, coluna ou paginação aparece com uma mensagem
+identificável em vez de um código hexadecimal isolado.
+
+Para substituir a versão contaminada, envie somente os arquivos deste pacote ao
+repositório `Gest-o-Validadores-Monday`. Não copie arquivos de outros projetos
+para a mesma pasta.
+
 ## GitHub Pages
 
 Crie um repositório separado, por exemplo:
