@@ -1,7 +1,7 @@
-# Primeiro teste controlado da V2.2
+# Primeiro teste controlado da V2.2.1
 
 1. Abra o sistema e faça login.
-2. Confirme a mensagem `V2.2 · filtros salvos ativos`.
+2. Confirme a mensagem `V2.2.1 · filtros salvos corrigidos`.
 3. Abra `Oferta para Produção` e clique em uma aba de período salva.
 4. Confirme que a quantidade de itens muda e que o nome do filtro aparece abaixo
    do título do quadro.

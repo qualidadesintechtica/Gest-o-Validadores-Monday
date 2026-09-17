@@ -1,4 +1,4 @@
-# Portal Operacional Monday — V2.2
+# Portal Operacional Monday — V2.2.1
 
 Aplicação interna para consultar e editar os quadros operacionais do Monday sem
 sair do site publicado no GitHub Pages.
@@ -25,7 +25,7 @@ gravação só ocorre após confirmação. Fórmula, espelho, ID, registros auto
 votos, controle de tempo e outros tipos que a API do Monday não permite alterar
 ficam visíveis como somente leitura.
 
-A descoberta V2.2 procura os quadros em toda a conta acessível pelo token, não
+A descoberta V2.2.1 procura os quadros em toda a conta acessível pelo token, não
 apenas no workspace do quadro principal. Se existirem nomes duplicados ou um
 item do menu não for um quadro, use o secret opcional `MONDAY_MENU_BOARD_IDS`
 para mapear explicitamente os IDs.
@@ -44,6 +44,11 @@ As abas superiores são carregadas diretamente das visualizações salvas de cad
 quadro no Monday. Ao selecionar uma aba, a Edge Function envia ao `items_page`
 o filtro e a ordenação registrados naquela visualização. Isso inclui abas como
 `26.1 SET/25 a DEZ/25`, sem duplicar manualmente as regras no front-end.
+
+A V2.2.1 converte os operadores devolvidos pelas visualizações (`AND`, `ANY_OF`,
+`ASC` e equivalentes) para os valores aceitos por `ItemsQuery` (`and`, `any_of`,
+`asc` e equivalentes). A conversão percorre regras e grupos aninhados e remove
+atributos de comparação vazios antes de consultar os itens.
 
 A aplicação continua exibindo os resultados em formato de tabela. Visualizações
 de gráfico podem carregar o filtro associado, mas o desenho específico do widget
@@ -74,5 +79,5 @@ Esta versão altera o front-end e a Edge Function. Publique primeiro
 `supabase/functions/monday-responsaveis/index.ts` e depois envie o conteúdo
 desta pasta diretamente para a raiz do repositório GitHub.
 
-Consulte `docs/PUBLICACAO_V2_2.md` para o procedimento completo e
+Consulte `docs/PUBLICACAO_V2_2_1.md` para o procedimento completo e
 `docs/PRIMEIRO_TESTE.md` para a validação controlada.

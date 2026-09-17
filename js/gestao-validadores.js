@@ -221,7 +221,7 @@
   function renderViews() {
     const savedViews = state.views.filter(view => {
       const name = norm(view.name);
-      return view.type !== "FORM" && name !== "quadro principal" && name !== "main table" && name !== "tabela principal";
+      return name !== "quadro principal" && name !== "main table" && name !== "tabela principal";
     });
     const buttons = [
       `<button type="button" class="gv-view-tab ${state.activeViewId ? "" : "is-active"}" data-view-id="">Quadro principal</button>`,
@@ -560,7 +560,7 @@
     document.querySelectorAll([".gv-global-actions button", ".gv-side-icon", ".gv-boardnav button", ".gv-nav-item:not([data-board-target])", ".gv-star", ".gv-board-actions > button:not(.gv-logout)"].join(","))
       .forEach(button => button.addEventListener("click", () => toast(`${button.title || button.textContent.trim() || "Opção"}: este é um produto do portal Monday, não uma função de quadro disponível pela integração.`, true)));
     window.GV_APP_READY = true;
-    $("gvControlsStatus").textContent = "V2.2 · filtros salvos ativos";
+    $("gvControlsStatus").textContent = "V2.2.1 · filtros salvos corrigidos";
   }
 
   async function start() {

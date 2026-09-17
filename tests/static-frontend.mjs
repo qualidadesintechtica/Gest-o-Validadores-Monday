@@ -28,7 +28,7 @@ const missing = [...new Set(usedIds)].filter(id => !dynamicEditorIds.has(id) && 
 assert.deepEqual(missing, []);
 
 for (const file of [html, login, config]) {
-  assert.ok(file.includes("20260917-v2.2-saved-views"));
+  assert.ok(file.includes("20260917-v2.2.1-view-normalization"));
   assert.ok(!file.includes("v1.7-real-monday-boards"));
 }
 
@@ -38,5 +38,6 @@ for (const action of ["workspace_bootstrap", "board_data", "update_cell", "updat
 
 assert.ok(html.includes('id="gvViews"'));
 assert.ok(js.includes("activeViewId"));
+assert.ok(!js.includes('view.type !== "FORM"'));
 
-console.log("static-frontend: navegação interna, filtros salvos e build V2.2 aprovados");
+console.log("static-frontend: navegação interna, todas as abas e build V2.2.1 aprovados");

@@ -116,14 +116,93 @@ function safeColumnId(value: unknown) {
 }
 
 function jsonObject(value: unknown) {
-  if (value && typeof value === "object") return value as Record<string, unknown>;
+  if (value && typeof value === "object" && !Array.isArray(value)) return value as Record<string, unknown>;
   if (typeof value !== "string" || !value.trim()) return null;
   try {
     const parsed = JSON.parse(value);
-    return parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : null;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : null;
   } catch (_error) {
     return null;
   }
+}
+
+function jsonArray(value: unknown) {
+  if (Array.isArray(value)) return value;
+  if (typeof value !== "string" || !value.trim()) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_error) {
+    return [];
+  }
+}
+
+const ITEMS_QUERY_RULE_OPERATORS = new Set([
+  "any_of", "not_any_of", "is_empty", "is_not_empty", "greater_than",
+  "greater_than_or_equals", "lower_than", "lower_than_or_equal", "between",
+  "not_contains_text", "contains_text", "contains_terms", "starts_with",
+  "ends_with", "within_the_next", "within_the_last",
+]);
+
+function normalizeQueryOperator(value: unknown, context: string) {
+  const operator = String(value ?? "and").trim().toLowerCase();
+  if (operator === "and" || operator === "or") return operator;
+  throw new AppError(`A visualização usa o operador de grupo “${operator}”, incompatível com ${context}.`, 422, "UNSUPPORTED_VIEW_FILTER");
+}
+
+function normalizeRuleOperator(value: unknown) {
+  let operator = String(value ?? "").trim().toLowerCase();
+  if (!operator) return "";
+  if (operator === "greater_than_or_equal") operator = "greater_than_or_equals";
+  if (operator === "lower_than_or_equals") operator = "lower_than_or_equal";
+  if (!ITEMS_QUERY_RULE_OPERATORS.has(operator)) {
+    throw new AppError(`A visualização usa o operador de filtro “${operator}”, ainda não aceito pelo Monday em items_page.`, 422, "UNSUPPORTED_VIEW_FILTER");
+  }
+  return operator;
+}
+
+function normalizeViewRule(value: unknown) {
+  const rule = jsonObject(value);
+  if (!rule) return null;
+  const columnId = safeColumnId(rule.column_id);
+  if (!columnId || !("compare_value" in rule)) return null;
+  const normalized: Record<string, unknown> = {
+    column_id: columnId,
+    compare_value: rule.compare_value,
+  };
+  const compareAttribute = String(rule.compare_attribute ?? "").trim();
+  if (compareAttribute) normalized.compare_attribute = compareAttribute;
+  const operator = normalizeRuleOperator(rule.operator);
+  if (operator) normalized.operator = operator;
+  return normalized;
+}
+
+function normalizeViewFilter(value: unknown, context = "o filtro salvo"): Record<string, unknown> | null {
+  const group = jsonObject(value);
+  if (!group) return null;
+  const rules = Array.isArray(group.rules) ? group.rules.map(normalizeViewRule).filter(Boolean) : [];
+  const groups = Array.isArray(group.groups)
+    ? group.groups.map(entry => normalizeViewFilter(entry, context)).filter(Boolean)
+    : [];
+  if (!rules.length && !groups.length) return null;
+  const normalized: Record<string, unknown> = { operator: normalizeQueryOperator(group.operator, context) };
+  if (rules.length) normalized.rules = rules;
+  if (groups.length) normalized.groups = groups;
+  return normalized;
+}
+
+function normalizeViewSort(value: unknown) {
+  return jsonArray(value).map(entry => {
+    const order = jsonObject(entry);
+    if (!order) return null;
+    const columnId = String(order.column_id ?? "").trim();
+    if (!columnId) return null;
+    const direction = String(order.direction ?? "asc").trim().toLowerCase();
+    if (direction !== "asc" && direction !== "desc") {
+      throw new AppError(`A visualização usa a ordenação “${direction}”, incompatível com items_page.`, 422, "UNSUPPORTED_VIEW_SORT");
+    }
+    return { column_id: columnId, direction };
+  }).filter(Boolean);
 }
 
 async function validateUser(req: Request) {
@@ -340,7 +419,7 @@ async function boardData(rootBoardId: number, body: any) {
 
   const views = (board.views || []).map((view: any) => ({
     id: String(view.id), name: view.name, type: view.type,
-    filter: jsonObject(view.filter), sort: Array.isArray(view.sort) ? view.sort : [],
+    filter: jsonObject(view.filter), sort: jsonArray(view.sort),
   }));
   const requestedViewId = String(body?.view_id || "").trim();
   const activeView = requestedViewId ? views.find((view: any) => view.id === requestedViewId) : null;
@@ -348,8 +427,9 @@ async function boardData(rootBoardId: number, body: any) {
     throw new AppError("A visualização selecionada não existe neste quadro.", 404, "VIEW_NOT_FOUND");
   }
   let queryParams: Record<string, unknown> | null = null;
-  if (activeView?.filter) queryParams = structuredClone(activeView.filter);
-  if (activeView?.sort?.length) queryParams = { ...(queryParams || {}), order_by: activeView.sort };
+  if (activeView?.filter) queryParams = normalizeViewFilter(activeView.filter, `a visualização “${activeView.name}”`);
+  const normalizedSort = activeView?.sort?.length ? normalizeViewSort(activeView.sort) : [];
+  if (normalizedSort.length) queryParams = { ...(queryParams || {}), order_by: normalizedSort };
 
   const quotedIds = selectedIds.map(id => `"${id}"`).join(",");
   const fragment = `
