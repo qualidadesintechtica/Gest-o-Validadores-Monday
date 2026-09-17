@@ -1,4 +1,4 @@
-# Portal Operacional Monday — V2.0
+# Portal Operacional Monday — V2.1
 
 Aplicação interna para consultar e editar os quadros operacionais do Monday sem
 sair do site publicado no GitHub Pages.
@@ -25,6 +25,19 @@ gravação só ocorre após confirmação. Fórmula, espelho, ID, registros auto
 votos, controle de tempo e outros tipos que a API do Monday não permite alterar
 ficam visíveis como somente leitura.
 
+A descoberta V2.1 procura os quadros em toda a conta acessível pelo token, não
+apenas no workspace do quadro principal. Se existirem nomes duplicados ou um
+item do menu não for um quadro, use o secret opcional `MONDAY_MENU_BOARD_IDS`
+para mapear explicitamente os IDs.
+
+```text
+{"Contratação Conteudista":"ID_DO_QUADRO","Critérios de Avaliação":"ID_DO_QUADRO"}
+```
+
+Sidekick, Agentes, Vibe, Fluxos, Analisador e outros produtos do portal Monday
+não são quadros e não são reproduzidos por esta integração. Eles permanecem
+identificados na interface, mas não executam os produtos proprietários do Monday.
+
 ## Arquitetura e segurança
 
 Navegador → Supabase Auth → Edge Function `monday-responsaveis` → Monday API
@@ -50,5 +63,5 @@ Esta versão altera o front-end e a Edge Function. Publique primeiro
 `supabase/functions/monday-responsaveis/index.ts` e depois envie o conteúdo
 desta pasta diretamente para a raiz do repositório GitHub.
 
-Consulte `docs/PUBLICACAO_V2_0.md` para o procedimento completo e
+Consulte `docs/PUBLICACAO_V2_1.md` para o procedimento completo e
 `docs/PRIMEIRO_TESTE.md` para a validação controlada.

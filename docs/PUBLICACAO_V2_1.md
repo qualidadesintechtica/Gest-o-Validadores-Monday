@@ -1,7 +1,7 @@
-# Publicação da V2.0
+# Publicação da V2.1
 
-A V2.0 substitui a abertura externa do Monday por carregamento e edição dos
-quadros dentro do próprio sistema.
+A V2.1 procura os quadros em toda a conta acessível pelo token e mantém o
+carregamento e a edição dentro do próprio sistema.
 
 ## 1. Atualizar a Edge Function
 
@@ -17,6 +17,13 @@ Mantenha os secrets existentes:
 - `MONDAY_API_TOKEN`
 - `MONDAY_VALIDACAO_BOARD_ID` com o valor `9433297929`
 
+Opcionalmente, se um quadro não for encontrado automaticamente, crie o secret
+`MONDAY_MENU_BOARD_IDS` com um objeto JSON que associe o texto do menu ao ID:
+
+```json
+{"Contratação Conteudista":"1234567890","Critérios de Avaliação":"2345678901"}
+```
+
 Não mostre nem copie o valor do token para o GitHub.
 
 ## 2. Atualizar o GitHub
@@ -29,14 +36,14 @@ os arquivos existentes. Não envie a pasta externa como uma subpasta.
 Depois que o GitHub Pages concluir a publicação, pressione `Ctrl + F5`. A linha
 de status deve mostrar:
 
-`V2.0 · edição interna ativa`
+`V2.1 · descoberta ampliada ativa`
 
 Ao clicar em qualquer quadro localizado no menu, o título e a tabela devem mudar
 dentro da própria página. Nenhuma nova guia deve ser aberta.
 
-Se um quadro ficar esmaecido, ele não foi localizado no mesmo workspace ou o
-token do Monday não tem permissão para consultá-lo. Verifique o nome do quadro e
-os logs da Edge Function antes de alterar código.
+Se um item ficar esmaecido, ele não apareceu como quadro acessível para o token.
+Confirme se o item é realmente um quadro de dados; pastas, painéis e documentos
+não possuem grupos, itens e colunas editáveis pelo mesmo fluxo.
 
 ## 4. Ordem do teste
 

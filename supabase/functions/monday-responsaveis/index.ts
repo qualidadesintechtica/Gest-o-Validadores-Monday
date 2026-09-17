@@ -11,14 +11,14 @@ const ALLOWED_DOMAINS = ["animaeducacao.com.br"];
 const BOARD_PAGE_SIZE = 100;
 const ITEM_PAGE_SIZE = 500;
 const MAX_VISIBLE_COLUMNS = 12;
-const NAVIGATION_TITLES = [
-  "oferta para producao",
-  "contratacao conteudista",
-  "esteira de producao",
-  "validacao de materiais",
-  "avaliacao da atuacao",
-  "criterios de avaliacao",
-  "paineis de validacao",
+const NAVIGATION_TARGETS = [
+  { label: "Oferta para Produção", aliases: ["oferta para producao"] },
+  { label: "Contratação Conteudista", aliases: ["contratacao conteudista", "contratacao de conteudista"] },
+  { label: "Esteira de Produção", aliases: ["esteira de producao"] },
+  { label: "Validação de Materiais", aliases: ["validacao de materiais"] },
+  { label: "Avaliação da Atuação", aliases: ["avaliacao da atuacao", "avaliacao da atuacao na validacao"] },
+  { label: "Critérios de Avaliação", aliases: ["criterios de avaliacao", "criterios para avaliacao"] },
+  { label: "Painéis de validação", aliases: ["paineis de validacao", "painel de validacao"] },
 ];
 const READ_ONLY_TYPES = new Set([
   "auto_number", "creation_log", "formula", "integration", "item_id",
@@ -32,9 +32,16 @@ type BoardLink = {
   url: string;
   workspace_id: string | null;
   items_count?: number;
+  menu_target?: string;
 };
 
-let navigationCache: { at: number; rootId: number; boards: BoardLink[] } | null = null;
+type NavigationDiscovery = {
+  boards: BoardLink[];
+  missingTargets: string[];
+  scannedCount: number;
+};
+
+let navigationCache: ({ at: number; rootId: number } & NavigationDiscovery) | null = null;
 
 class AppError extends Error {
   status: number;
@@ -66,6 +73,41 @@ function norm(value: unknown) {
 
 function boardKey(value: unknown) {
   return norm(value).replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function significantTokens(value: unknown) {
+  const ignored = new Set(["a", "as", "de", "da", "das", "do", "dos", "e", "em", "na", "nas", "no", "nos", "para"]);
+  return boardKey(value).split(" ").filter(token => token.length > 1 && !ignored.has(token));
+}
+
+function boardMatchScore(boardName: string, aliases: string[]) {
+  const candidate = boardKey(boardName);
+  let best = 0;
+  for (const aliasValue of aliases) {
+    const alias = boardKey(aliasValue);
+    if (candidate === alias) best = Math.max(best, 100);
+    else if (candidate.includes(alias) || alias.includes(candidate)) best = Math.max(best, 85);
+    const wanted = significantTokens(alias);
+    const available = new Set(significantTokens(candidate));
+    if (wanted.length && wanted.every(token => available.has(token))) {
+      best = Math.max(best, 70 + Math.min(10, wanted.length));
+    }
+  }
+  return best;
+}
+
+function configuredBoardIds() {
+  const raw = Deno.env.get("MONDAY_MENU_BOARD_IDS") || "";
+  if (!raw) return new Map<string, string>();
+  try {
+    const parsed = JSON.parse(raw);
+    const entries = parsed && typeof parsed === "object" ? Object.entries(parsed) : [];
+    return new Map(entries
+      .map(([label, id]) => [boardKey(label), String(id ?? "").trim()] as const)
+      .filter(([, id]) => /^\d+$/.test(id)));
+  } catch (_error) {
+    throw new AppError("Secret MONDAY_MENU_BOARD_IDS contém JSON inválido.", 500, "INVALID_BOARD_MAP");
+  }
 }
 
 function safeColumnId(value: unknown) {
@@ -136,9 +178,9 @@ async function monday(query: string, variables: Record<string, unknown> = {}, st
   return payload.data;
 }
 
-async function loadAllowedBoards(rootBoardId: number, force = false): Promise<BoardLink[]> {
+async function loadAllowedBoards(rootBoardId: number, force = false): Promise<NavigationDiscovery> {
   if (!force && navigationCache && navigationCache.rootId === rootBoardId && Date.now() - navigationCache.at < 300000) {
-    return navigationCache.boards;
+    return navigationCache;
   }
   const rootData = await monday(
     `query ($ids: [ID!]) { boards(ids: $ids) { id name url workspace_id } }`,
@@ -148,17 +190,16 @@ async function loadAllowedBoards(rootBoardId: number, force = false): Promise<Bo
   const root = rootData?.boards?.[0];
   if (!root) throw new AppError(`Quadro principal ${rootBoardId} não encontrado.`, 502, "ROOT_BOARD_NOT_FOUND");
 
-  const workspaceId = root.workspace_id ? String(root.workspace_id) : null;
   const candidates: BoardLink[] = [];
   for (let page = 1; page <= 10; page++) {
     const data = await monday(
-      `query ($page: Int!, $workspaceIds: [ID]) {
-        boards(limit: ${BOARD_PAGE_SIZE}, page: $page, state: active, workspace_ids: $workspaceIds) {
+      `query ($page: Int!) {
+        boards(limit: ${BOARD_PAGE_SIZE}, page: $page, state: active) {
           id name url workspace_id items_count
         }
       }`,
-      { page, workspaceIds: workspaceId ? [workspaceId] : null },
-      "carregamento dos quadros do menu",
+      { page },
+      "descoberta dos quadros acessíveis da conta",
     );
     const pageBoards = Array.isArray(data?.boards) ? data.boards : [];
     candidates.push(...pageBoards.map((board: any) => ({
@@ -169,41 +210,80 @@ async function loadAllowedBoards(rootBoardId: number, force = false): Promise<Bo
     if (pageBoards.length < BOARD_PAGE_SIZE) break;
   }
 
+  const configured = configuredBoardIds();
+  const configuredIds = [...new Set(configured.values())];
+  if (configuredIds.length) {
+    const explicitData = await monday(
+      `query ($ids: [ID!]) { boards(ids: $ids) { id name url workspace_id items_count } }`,
+      { ids: configuredIds },
+      "carregamento dos quadros configurados",
+    );
+    const known = new Set(candidates.map(candidate => candidate.id));
+    for (const board of explicitData?.boards || []) {
+      if (known.has(String(board.id))) continue;
+      candidates.push({
+        id: String(board.id), name: board.name, url: board.url,
+        workspace_id: board.workspace_id ? String(board.workspace_id) : null,
+        items_count: Number(board.items_count || 0),
+      });
+    }
+  }
+
   const ordered: BoardLink[] = [];
   const used = new Set<string>();
-  NAVIGATION_TITLES.forEach(title => {
-    candidates.forEach(candidate => {
-      const key = boardKey(candidate.name);
-      if (!used.has(candidate.id) && (key === title || key.includes(title))) {
-        used.add(candidate.id);
-        ordered.push(candidate);
-      }
-    });
+  const missingTargets: string[] = [];
+  NAVIGATION_TARGETS.forEach(target => {
+    const configuredId = configured.get(boardKey(target.label));
+    const ranked = candidates
+      .filter(candidate => !used.has(candidate.id))
+      .map(candidate => ({
+        candidate,
+        score: configuredId === candidate.id
+          ? 1000
+          : boardMatchScore(candidate.name, target.aliases) + (candidate.workspace_id === String(root.workspace_id || "") ? 3 : 0),
+      }))
+      .filter(entry => entry.score >= 70)
+      .sort((a, b) => b.score - a.score || Number(b.candidate.items_count || 0) - Number(a.candidate.items_count || 0));
+    const chosen = ranked[0]?.candidate;
+    if (!chosen) {
+      missingTargets.push(target.label);
+      return;
+    }
+    used.add(chosen.id);
+    ordered.push({ ...chosen, menu_target: target.label });
   });
   if (!used.has(String(root.id))) {
-    ordered.push({ id: String(root.id), name: root.name, url: root.url, workspace_id: root.workspace_id ? String(root.workspace_id) : null });
+    ordered.push({
+      id: String(root.id), name: root.name, url: root.url,
+      workspace_id: root.workspace_id ? String(root.workspace_id) : null,
+      menu_target: "Validação de Materiais",
+    });
   }
-  navigationCache = { at: Date.now(), rootId: rootBoardId, boards: ordered };
-  return ordered;
+  navigationCache = {
+    at: Date.now(), rootId: rootBoardId, boards: ordered,
+    missingTargets, scannedCount: candidates.length,
+  };
+  return navigationCache;
 }
 
 async function allowedBoard(rootBoardId: number, requestedBoardId: number) {
-  const boards = await loadAllowedBoards(rootBoardId);
+  const { boards } = await loadAllowedBoards(rootBoardId);
   const board = boards.find(candidate => Number(candidate.id) === requestedBoardId);
   if (!board) throw new AppError("Este quadro não pertence ao menu autorizado.", 403, "BOARD_NOT_ALLOWED");
   return board;
 }
 
 async function workspaceBootstrap(rootBoardId: number) {
-  const [boards, usersData] = await Promise.all([
-    loadAllowedBoards(rootBoardId, true),
+  const [discovery, usersData] = await Promise.all([
+    loadAllowedBoards(rootBoardId),
     monday(`query { users(limit: 1000, page: 1) { id name email } }`, {}, "carregamento dos responsáveis"),
   ]);
   return {
     ok: true,
-    boards,
+    boards: discovery.boards,
+    missing_targets: discovery.missingTargets,
     users: (usersData?.users || []).map((user: any) => ({ id: String(user.id), name: user.name, email: user.email || "" })),
-    diagnostics: { api_version: API_VERSION },
+    diagnostics: { api_version: API_VERSION, boards_scanned: discovery.scannedCount },
   };
 }
 

@@ -10,6 +10,7 @@
 
   let state = {
     boards: [],
+    missingTargets: [],
     users: [],
     sortedUsers: [],
     board: null,
@@ -256,6 +257,8 @@
 
   function findBoard(target) {
     const wanted = boardKey(target);
+    const mapped = state.boards.find(board => boardKey(board.menu_target) === wanted);
+    if (mapped) return mapped;
     const exact = state.boards.find(board => boardKey(board.name) === wanted);
     if (exact) return exact;
     const candidates = state.boards.filter(board => boardKey(board.name).includes(wanted) || wanted.includes(boardKey(board.name)));
@@ -267,7 +270,9 @@
       const board = findBoard(element.dataset.boardTarget);
       element.classList.toggle("is-unavailable", !board);
       element.dataset.boardId = board?.id || "";
-      element.title = board ? `Carregar ${board.name} dentro do sistema` : "Quadro não localizado ou sem permissão";
+      element.title = board
+        ? `Carregar ${board.name} dentro do sistema`
+        : "Este item não apareceu como quadro na API do Monday. Pode ser painel, pasta, nome diferente ou falta de permissão.";
     });
   }
 
@@ -462,7 +467,7 @@
 
     document.querySelectorAll("[data-board-target]").forEach(element => element.addEventListener("click", () => {
       const boardId = element.dataset.boardId;
-      if (!boardId) return toast(`Quadro “${element.dataset.boardTarget}” não localizado ou sem permissão.`, true);
+      if (!boardId) return toast(`“${element.dataset.boardTarget}” não apareceu como quadro acessível na API. Verifique se é painel/pasta, o nome real ou a permissão do token.`, true);
       loadBoard(boardId);
     }));
     document.querySelectorAll("[data-section-toggle]").forEach(section => section.addEventListener("click", () => {
@@ -523,9 +528,9 @@
     });
 
     document.querySelectorAll([".gv-global-actions button", ".gv-side-icon", ".gv-boardnav button", ".gv-nav-item:not([data-board-target])", ".gv-star", ".gv-board-actions > button:not(.gv-logout)"].join(","))
-      .forEach(button => button.addEventListener("click", () => toast(`${button.title || button.textContent.trim() || "Opção"}: recurso visual fora do escopo dos quadros.`)));
+      .forEach(button => button.addEventListener("click", () => toast(`${button.title || button.textContent.trim() || "Opção"}: este é um produto do portal Monday, não uma função de quadro disponível pela integração.`, true)));
     window.GV_APP_READY = true;
-    $("gvControlsStatus").textContent = "V2.0 · edição interna ativa";
+    $("gvControlsStatus").textContent = "V2.1 · descoberta ampliada ativa";
   }
 
   async function start() {
@@ -549,12 +554,16 @@
     try {
       const payload = await call("workspace_bootstrap");
       state.boards = Array.isArray(payload.boards) ? payload.boards : [];
+      state.missingTargets = Array.isArray(payload.missing_targets) ? payload.missing_targets : [];
       state.users = Array.isArray(payload.users) ? payload.users : [];
       state.sortedUsers = state.users.slice().sort((a, b) => userLabel(a).localeCompare(userLabel(b), "pt-BR"));
       syncBoardMenu();
       const initial = state.boards.find(board => Number(board.id) === ROOT_BOARD_ID) || state.boards.find(board => boardKey(board.name).includes("validacao de materiais")) || state.boards[0];
       if (!initial) throw new Error("Nenhum quadro do menu foi localizado para o token configurado.");
       await loadBoard(initial.id);
+      if (state.missingTargets.length) {
+        toast(`${state.missingTargets.length} item(ns) do menu não apareceram como quadros na API: ${state.missingTargets.join(", ")}.`, true);
+      }
     } catch (error) {
       console.error(error);
       $("gvStatus").textContent = "Erro";

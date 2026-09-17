@@ -102,6 +102,9 @@ async function call(body) {
 const bootstrap = await call({ action: "workspace_bootstrap" });
 assert.equal(bootstrap.status, 200);
 assert.equal(bootstrap.body.boards.length, 7);
+assert.equal(bootstrap.body.missing_targets.length, 0);
+assert.equal(bootstrap.body.diagnostics.boards_scanned, 7);
+assert.equal(bootstrap.body.boards.find(board => board.name === "Contratação Conteudista").menu_target, "Contratação Conteudista");
 
 const data = await call({ action: "board_data", board_id: 9433297929, column_ids: ["text", "people"] });
 assert.equal(data.status, 200);

@@ -28,7 +28,7 @@ const missing = [...new Set(usedIds)].filter(id => !dynamicEditorIds.has(id) && 
 assert.deepEqual(missing, []);
 
 for (const file of [html, login, config]) {
-  assert.ok(file.includes("20260917-v2.0-internal-boards"));
+  assert.ok(file.includes("20260917-v2.1-account-discovery"));
   assert.ok(!file.includes("v1.7-real-monday-boards"));
 }
 
@@ -36,4 +36,4 @@ for (const action of ["workspace_bootstrap", "board_data", "update_cell", "updat
   assert.ok(js.includes(`\"${action}\"`));
 }
 
-console.log("static-frontend: navegação interna, controles e build V2.0 aprovados");
+console.log("static-frontend: navegação interna, controles e build V2.1 aprovados");
