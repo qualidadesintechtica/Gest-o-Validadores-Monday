@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Validação de Materiais | Operação Digital</title>
-  <link rel="stylesheet" href="css/app.css?v=20260916-v1.6-interactive-events">
+  <link rel="stylesheet" href="css/app.css?v=20260917-v1.7-real-monday-boards">
 </head>
 <body>
   <div class="gv-noticebar">
@@ -64,18 +64,18 @@
         <div class="gv-nav-heading">Conteúdo <span>••• ＋</span></div>
         <div class="gv-nav-item"><span>▦</span> Gerir área de trabalho</div>
 
-        <div class="gv-nav-section is-green"><span>⌄</span> PLANEJAMENTO</div>
-        <div class="gv-nav-item"><span>♧</span> 📌 Oferta para Produção</div>
-        <div class="gv-nav-item"><span>♧</span> 🖊 Contratação Conteudista</div>
+        <div class="gv-nav-section is-green" data-section-toggle="planejamento"><span>⌄</span> PLANEJAMENTO</div>
+        <div class="gv-nav-item" data-section-item="planejamento" data-board-target="Oferta para Produção"><span>♧</span> 📌 Oferta para Produção</div>
+        <div class="gv-nav-item" data-section-item="planejamento" data-board-target="Contratação Conteudista"><span>♧</span> 🖊 Contratação Conteudista</div>
 
-        <div class="gv-nav-section is-blue"><span>⌄</span> ESTEIRA DE PRODUÇÃO</div>
-        <div class="gv-nav-item"><span>♧</span> 🚀 Esteira de Produção</div>
+        <div class="gv-nav-section is-blue" data-section-toggle="esteira"><span>⌄</span> ESTEIRA DE PRODUÇÃO</div>
+        <div class="gv-nav-item" data-section-item="esteira" data-board-target="Esteira de Produção"><span>♧</span> 🚀 Esteira de Produção</div>
 
-        <div class="gv-nav-section is-purple"><span>⌄</span> VALIDAÇÃO</div>
-        <div class="gv-nav-item is-active"><span>▣</span> ☑ Validação de Materiais</div>
-        <div class="gv-nav-item"><span>♧</span> Avaliação da Atuação</div>
-        <div class="gv-nav-item"><span>♧</span> Critérios de Avaliação</div>
-        <div class="gv-nav-item"><span>▣</span> ☑ Painéis de validação</div>
+        <div class="gv-nav-section is-purple" data-section-toggle="validacao"><span>⌄</span> VALIDAÇÃO</div>
+        <div class="gv-nav-item is-active" data-section-item="validacao" data-board-target="Validação de Materiais"><span>▣</span> ☑ Validação de Materiais</div>
+        <div class="gv-nav-item" data-section-item="validacao" data-board-target="Avaliação da Atuação"><span>♧</span> Avaliação da Atuação</div>
+        <div class="gv-nav-item" data-section-item="validacao" data-board-target="Critérios de Avaliação"><span>♧</span> Critérios de Avaliação</div>
+        <div class="gv-nav-item" data-section-item="validacao" data-board-target="Painéis de validação"><span>▣</span> ☑ Painéis de validação</div>
         <div class="gv-nav-section"><span>›</span> PAINÉIS</div>
       </div>
     </aside>
@@ -170,7 +170,7 @@
 
       <section class="gv-statusline" aria-label="Status da integração">
         <span><i class="gv-live-dot"></i><strong id="gvStatus">Conectando...</strong></span>
-        <span class="gv-controls-status"><i class="gv-controls-dot"></i><strong id="gvControlsStatus">Ativando controles...</strong></span>
+        <span class="gv-controls-status"><i class="gv-controls-dot"></i><strong id="gvControlsStatus">Ativando V1.7...</strong></span>
         <span id="gvBoard">Carregando...</span>
         <span><strong id="gvTotal">0</strong> itens</span>
         <span><strong id="gvExibidos">0</strong> exibidos</span>
@@ -208,10 +208,10 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/config.js?v=20260916-v1.6-interactive-events"></script>
-  <script src="js/supabase.js?v=20260916-v1.6-interactive-events"></script>
-  <script src="js/auth.js?v=20260916-v1.6-interactive-events"></script>
-  <script src="js/gestao-validadores.js?v=20260916-v1.6-interactive-events"></script>
+  <script src="js/config.js?v=20260917-v1.7-real-monday-boards"></script>
+  <script src="js/supabase.js?v=20260917-v1.7-real-monday-boards"></script>
+  <script src="js/auth.js?v=20260917-v1.7-real-monday-boards"></script>
+  <script src="js/gestao-validadores.js?v=20260917-v1.7-real-monday-boards"></script>
   <script>
     window.setTimeout(function () {
       if (window.GV_APP_READY) return;

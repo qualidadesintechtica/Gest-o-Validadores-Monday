@@ -13,6 +13,7 @@
     sortedUsers: [],
     columns: null,
     board: null,
+    navigation: { boards: [] },
     collapsedGroups: new Set(),
     groupLimits: new Map(),
     view: "all"
@@ -23,6 +24,7 @@
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
   }[c]));
   const norm = v => String(v ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  const boardKey = v => norm(v).replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
 
   function groupColor(name) {
     const normalized = norm(name);
@@ -254,6 +256,40 @@
     $("gvCreateGroup").innerHTML = '<option value="">Selecione um grupo</option>' + groups.map(([id, title]) => `<option value="${esc(id)}">${esc(title)}</option>`).join("");
   }
 
+  function findNavigationBoard(target) {
+    const wanted = boardKey(target);
+    const boards = Array.isArray(state.navigation?.boards) ? state.navigation.boards : [];
+    const exact = boards.find(board => boardKey(board.name) === wanted);
+    if (exact) return exact;
+    const candidates = boards.filter(board => {
+      const key = boardKey(board.name);
+      return key.includes(wanted) || wanted.includes(key);
+    });
+    return candidates.length === 1 ? candidates[0] : null;
+  }
+
+  function syncNavigationLinks() {
+    document.querySelectorAll("[data-board-target]").forEach(element => {
+      const board = findNavigationBoard(element.dataset.boardTarget);
+      element.classList.toggle("is-board-link", Boolean(board?.url));
+      element.classList.toggle("is-unavailable", !board?.url);
+      element.title = board?.url
+        ? `Abrir ${board.name} no Monday`
+        : `Quadro ${element.dataset.boardTarget} não localizado no workspace atual`;
+    });
+  }
+
+  function openMondayBoard(element) {
+    const target = element.dataset.boardTarget || "";
+    const board = findNavigationBoard(target);
+    if (!board?.url || !/^https:\/\//i.test(board.url)) {
+      toast(`Não localizei o quadro “${target}” no workspace atual ou o token não possui acesso.`, true);
+      return;
+    }
+    window.open(board.url, "_blank", "noopener,noreferrer");
+    toast(`Abrindo ${board.name} no Monday.`);
+  }
+
   async function carregar() {
     $("gvStatus").textContent = "Carregando...";
     $("gvBoard").textContent = "Carregando...";
@@ -279,6 +315,7 @@
       $("gvTotal").textContent = payload.items.length.toLocaleString("pt-BR");
       $("gvStatus").textContent = "Conectado";
       renderSelectors();
+      syncNavigationLinks();
       render();
     } catch (error) {
       console.error(error);
@@ -488,12 +525,25 @@
       });
     });
 
+    document.querySelectorAll("[data-board-target]").forEach(element => {
+      element.addEventListener("click", () => openMondayBoard(element));
+    });
+
+    document.querySelectorAll("[data-section-toggle]").forEach(section => {
+      section.addEventListener("click", () => {
+        const sectionName = section.dataset.sectionToggle;
+        const items = document.querySelectorAll(`[data-section-item="${sectionName}"]`);
+        const collapse = !section.classList.contains("is-collapsed");
+        section.classList.toggle("is-collapsed", collapse);
+        items.forEach(item => item.classList.toggle("is-section-hidden", collapse));
+      });
+    });
+
     document.querySelectorAll([
       ".gv-global-actions button",
       ".gv-side-icon",
       ".gv-boardnav button",
-      ".gv-nav-item",
-      ".gv-nav-section",
+      ".gv-nav-item:not([data-board-target])",
       ".gv-star",
       ".gv-board-actions > button:not(.gv-logout)",
       ".gv-view-add"
@@ -515,11 +565,6 @@
           toast("As quatro visualizações disponíveis já estão configuradas para a gestão de validadores.");
           return;
         }
-        if (button.classList.contains("gv-nav-item") && button.classList.contains("is-active")) {
-          $("gvBoardContent").scrollTo({ top: 0, behavior: "smooth" });
-          toast("Quadro Validação de Materiais ativo.");
-          return;
-        }
         toast(`${label}: este atalho pertence ao ambiente completo do Monday e não altera este aplicativo.`);
       });
     });
@@ -532,7 +577,7 @@
 
     window.GV_INTERACTIONS_BOUND = true;
     window.GV_APP_READY = true;
-    if ($("gvControlsStatus")) $("gvControlsStatus").textContent = "Controles V1.6 ativos";
+    if ($("gvControlsStatus")) $("gvControlsStatus").textContent = "V1.7 · quadros reais ativos";
   }
 
   document.addEventListener("DOMContentLoaded", async () => {

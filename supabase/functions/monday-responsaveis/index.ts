@@ -10,6 +10,15 @@ const DEFAULT_BOARD_ID = 9433297929;
 const GESTOR_TITLES = ["Gestor de Validação - NQ", "Gestor de Validação", "Gestor Validacao - NQ"];
 const REVISOR_TITLES = ["Revisor Validador", "Revisor de Validação", "Revisor Validacao"];
 const ALLOWED_DOMAINS = ["animaeducacao.com.br"];
+const NAVIGATION_TITLES = [
+  "oferta para producao",
+  "contratacao conteudista",
+  "esteira de producao",
+  "validacao de materiais",
+  "avaliacao da atuacao",
+  "criterios de avaliacao",
+  "paineis de validacao",
+];
 
 class AppError extends Error {
   status: number;
@@ -41,6 +50,10 @@ function norm(v: unknown) {
     .toLowerCase()
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function boardKey(v: unknown) {
+  return norm(v).replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
 }
 
 async function validateUser(req: Request) {
@@ -174,12 +187,52 @@ function peopleFromValue(cv: any) {
   return list.map((p: any) => ({ id: String(p.id), kind: p.kind || "person" }));
 }
 
+async function loadNavigationBoards(workspaceId: string | null) {
+  const boards: any[] = [];
+  const limit = 100;
+
+  for (let page = 1; page <= 10; page++) {
+    const query = `
+      query ($page: Int!, $workspaceIds: [ID]) {
+        boards(limit: ${limit}, page: $page, state: active, workspace_ids: $workspaceIds) {
+          id
+          name
+          url
+          workspace_id
+        }
+      }
+    `;
+    const data = await monday(
+      query,
+      { page, workspaceIds: workspaceId ? [workspaceId] : null },
+      "carregamento da navegação",
+    );
+    const pageBoards = Array.isArray(data?.boards) ? data.boards : [];
+    boards.push(...pageBoards);
+    if (pageBoards.length < limit) break;
+  }
+
+  return boards
+    .filter((candidate: any) => {
+      const key = boardKey(candidate?.name);
+      return NAVIGATION_TITLES.some(title => key === title || key.includes(title));
+    })
+    .map((candidate: any) => ({
+      id: String(candidate.id),
+      name: candidate.name,
+      url: candidate.url,
+      workspace_id: candidate.workspace_id ? String(candidate.workspace_id) : null,
+    }));
+}
+
 async function bootstrap(boardId: number) {
   const boardQuery = `
     query ($boardId: [ID!]) {
       boards(ids: $boardId) {
         id
         name
+        url
+        workspace_id
         groups { id title }
         columns { id title type }
       }
@@ -220,6 +273,14 @@ async function bootstrap(boardId: number) {
 
   const usersQuery = `query { users(limit: 1000, page: 1) { id name email } }`;
   const usersData = await monday(usersQuery, {}, "carregamento dos responsáveis");
+  let navigationBoards: any[] = [];
+  try {
+    navigationBoards = await loadNavigationBoards(
+      board.workspace_id ? String(board.workspace_id) : null,
+    );
+  } catch (error) {
+    console.error("Não foi possível carregar os quadros do menu", error);
+  }
 
   const ids = [gestorCol.id, revisorCol.id]
     .map((id: string) => `\"${id.replace(/[^a-zA-Z0-9_]/g, "")}\"`)
@@ -293,6 +354,8 @@ async function bootstrap(boardId: number) {
     board: {
       id: String(board.id),
       name: board.name,
+      url: board.url,
+      workspace_id: board.workspace_id ? String(board.workspace_id) : null,
       groups: (board.groups || []).map((group: any) => ({
         id: String(group.id),
         title: group.title,
@@ -307,6 +370,7 @@ async function bootstrap(boardId: number) {
       name: u.name,
       email: u.email || "",
     })),
+    navigation: { boards: navigationBoards },
     items: normalizedItems,
     diagnostics: { api_version: API_VERSION, pages_read: guard + 1 },
   };

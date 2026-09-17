@@ -110,6 +110,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 .gv-nav-item span{flex:0 0 auto}
 .gv-nav-item:hover{background:#242a44;color:#fff}
 .gv-nav-item.is-active{background:#155a9a;color:#fff}
+.gv-nav-item.is-board-link:after{content:"↗";margin-left:auto;color:#7eb5ee;font-size:12px}
+.gv-nav-item.is-unavailable{opacity:.55}
+.gv-nav-item.is-section-hidden{display:none}
+.gv-nav-section.is-collapsed span{transform:rotate(-90deg)}
+.gv-nav-section span{transition:transform .15s ease}
 
 /* cabeçalho do quadro */
 .gv-main{min-width:0;min-height:0;background:var(--page);padding:0 22px 16px;display:flex;flex-direction:column;isolation:isolate}
