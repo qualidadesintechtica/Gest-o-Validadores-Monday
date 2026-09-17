@@ -1,16 +1,16 @@
-# Primeiro teste controlado
-
-Para evitar uma alteração acidental em vários itens, use apenas um registro conhecido.
+# Primeiro teste controlado da V2.0
 
 1. Abra o sistema e faça login.
-2. Confirme a mensagem `V1.7 · quadros reais ativos`.
-3. Clique em `Critérios de Avaliação` e confirme que o quadro real abre em nova guia.
-4. Volte ao sistema e pesquise pelo nome ou ID de um item conhecido.
-5. Anote o Gestor e Revisor atuais no Monday.
-6. No sistema, altere somente o Revisor.
-7. Clique em `Salvar no Monday`.
-8. Confirme a alteração.
-9. Atualize o item no Monday e confira o novo responsável.
-10. Se estiver correto, repita o teste com o Gestor.
+2. Confirme a mensagem `V2.0 · edição interna ativa`.
+3. Clique em `Critérios de Avaliação`.
+4. Confirme que o título e os itens mudam na mesma tela, sem abrir outra guia.
+5. Abra `Colunas`, escolha uma coluna de texto e uma de pessoa e clique em
+   `Aplicar colunas`.
+6. Localize um item conhecido e anote o valor atual no Monday.
+7. Clique na célula, altere um único valor e confirme a gravação.
+8. Atualize o item no Monday e confira o novo valor.
+9. Volte ao sistema, clique em `Atualizar dados do Monday` e confira a célula.
+10. Repita a navegação nos outros seis quadros antes de liberar o uso geral.
 
-Se a função retornar erro de coluna, confira no Monday se os títulos continuam sendo `Gestor de Validação - NQ` e `Revisor Validador`.
+Campos marcados como `somente leitura` são calculados ou bloqueados pela API do
+Monday e não devem abrir o editor.

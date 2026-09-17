@@ -110,7 +110,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 .gv-nav-item span{flex:0 0 auto}
 .gv-nav-item:hover{background:#242a44;color:#fff}
 .gv-nav-item.is-active{background:#155a9a;color:#fff}
-.gv-nav-item.is-board-link:after{content:"↗";margin-left:auto;color:#7eb5ee;font-size:12px}
+.gv-nav-item[data-board-target]:after{content:"›";margin-left:auto;color:#7eb5ee;font-size:14px}
 .gv-nav-item.is-unavailable{opacity:.55}
 .gv-nav-item.is-section-hidden{display:none}
 .gv-nav-section.is-collapsed span{transform:rotate(-90deg)}
@@ -227,7 +227,36 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 .gv-show-more span{float:right;color:#b4b8c9}
 .gv-group-table .is-hidden{display:none}
 
-/* modal de criação */
+/* quadro dinâmico V2.0 */
+.gv-column-popover{width:330px;max-width:calc(100vw - 36px)}
+.gv-column-list{max-height:360px;overflow:auto;display:grid;gap:2px;padding:3px 2px;scrollbar-width:thin}
+.gv-column-list label{min-height:31px;padding:4px 6px;border-radius:4px;display:grid;grid-template-columns:18px minmax(0,1fr) auto;align-items:center;gap:7px}
+.gv-column-list label:hover{background:#353b59}
+.gv-column-list span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+.gv-column-list small{color:#9fa4b9;font-size:9px;max-width:90px;overflow:hidden;text-overflow:ellipsis}
+.gv-menu-action{height:34px!important;text-align:center!important;background:var(--monday-blue)!important;color:#fff!important;font-weight:600}
+.gv-menu-action:hover{background:var(--monday-blue-hover)!important}
+.gv-dynamic-table{table-layout:auto}
+.gv-dynamic-table th,.gv-dynamic-table td{min-width:190px;max-width:290px}
+.gv-group-table.gv-dynamic-table th:nth-child(n+2){width:190px}
+.gv-dynamic-table th:first-child,.gv-dynamic-table td:first-child{position:sticky;left:0;z-index:4;min-width:300px;width:300px;max-width:300px}
+.gv-dynamic-table th:first-child{z-index:6;background:#282d48}
+.gv-dynamic-table td:first-child{background:var(--cell)}
+.gv-dynamic-table tbody tr:hover td:first-child{background:var(--cell-hover)}
+.gv-dynamic-table th span,.gv-dynamic-table th small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gv-dynamic-table th small{margin-top:2px;color:#9ea3b8;font-size:8px;font-weight:400;text-transform:lowercase}
+.gv-name-edit{width:100%;padding:0;border:0;background:transparent;text-align:left;cursor:pointer}
+.gv-name-edit:hover{color:#73b7ff;text-decoration:underline}
+.gv-cell{display:block;width:100%;min-height:34px;padding:6px 9px;border:1px solid transparent;border-radius:4px;background:#292f49;color:#f5f6fa;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.gv-cell:hover{border-color:#71b3f6;background:#242b46}
+.gv-cell.is-readonly{color:#adb1c2;background:transparent;cursor:not-allowed}
+.gv-cell.is-readonly:hover{border-color:transparent;background:transparent}
+.gv-cell.type-status,.gv-cell.type-dropdown{border-left:4px solid #579bfc}
+.gv-cell.type-people{border-left:4px solid #a25ddc}
+.gv-cell.type-date,.gv-cell.type-timeline{border-left:4px solid #fdab3d}
+.gv-cell.type-checkbox{border-left:4px solid #00c875}
+
+/* editor de célula */
 .gv-dialog{width:min(480px,calc(100vw - 28px));padding:0;border:1px solid #606681;border-radius:8px;background:#252a44;color:#fff;box-shadow:0 24px 70px rgba(0,0,0,.55)}
 .gv-dialog::backdrop{background:rgba(5,8,20,.72);backdrop-filter:blur(2px)}
 .gv-dialog form{padding:20px;display:grid;gap:15px}
@@ -235,10 +264,19 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 .gv-dialog-head small{color:#9da2b7;font-size:9px;letter-spacing:.08em}
 .gv-dialog-head h2{margin:3px 0 0;font-size:20px}
 .gv-dialog-head button{border:0;background:transparent;color:#fff;font-size:23px;cursor:pointer}
-.gv-dialog form>label{display:grid;gap:6px;color:#d7d9e4;font-size:12px}
-.gv-dialog input,.gv-dialog select{height:38px;border:1px solid #656b86;border-radius:4px;background:#1d223a;color:#fff;padding:0 10px;outline:0}
+.gv-dialog form>label,.gv-cell-editor label{display:grid;gap:6px;color:#d7d9e4;font-size:12px}
+.gv-dialog input,.gv-dialog select,.gv-dialog textarea{width:100%;border:1px solid #656b86;border-radius:4px;background:#1d223a;color:#fff;padding:8px 10px;outline:0}
+.gv-dialog input,.gv-dialog select{height:38px}
+.gv-dialog textarea{min-height:92px;resize:vertical;line-height:1.45}
+.gv-dialog input:focus,.gv-dialog select:focus,.gv-dialog textarea:focus{border-color:#71b3f6}
 .gv-dialog select option{background:#252a44}
 .gv-dialog form>p{margin:0;color:#aeb2c3;font-size:11px}
+.gv-cell-editor{display:grid;gap:12px}
+.gv-cell-editor>small{color:#adb1c3;font-size:10px}
+.gv-cell-editor select[multiple]{height:auto;min-height:150px;padding:5px}
+.gv-editor-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.gv-editor-check{grid-template-columns:22px 1fr!important;align-items:center;cursor:pointer}
+.gv-editor-check input{width:18px;height:18px;padding:0;accent-color:var(--monday-blue)}
 .gv-dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:3px}
 .gv-dialog-actions>button:not(.gv-primary){height:36px;border:1px solid #686e89;background:transparent;border-radius:4px;padding:0 13px;cursor:pointer}
 

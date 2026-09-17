@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Validação de Materiais | Operação Digital</title>
-  <link rel="stylesheet" href="css/app.css?v=20260917-v1.7-real-monday-boards">
+  <title>Portal Operacional Monday | Operação Digital</title>
+  <link rel="stylesheet" href="css/app.css?v=20260917-v2.0-internal-boards">
 </head>
 <body>
   <div class="gv-noticebar">
@@ -86,11 +86,11 @@
           <span class="gv-board-check">✓</span>
           <div>
             <div class="gv-title-line">
-              <h1>Validação de Materiais</h1>
+              <h1 id="gvBoardTitle">Carregando quadro...</h1>
               <span class="gv-title-chevron">⌄</span>
               <button class="gv-star" type="button" title="Favoritar">☆</button>
             </div>
-            <p>Gestão de responsáveis pelas validações</p>
+            <p id="gvBoardSubtitle">Quadros e edições dentro do sistema</p>
           </div>
         </div>
         <div class="gv-board-actions">
@@ -105,18 +105,14 @@
 
       <nav class="gv-views" aria-label="Visualizações do quadro">
         <button type="button" class="gv-view-tab is-active" data-view="all">Quadro principal</button>
-        <button type="button" class="gv-view-tab" data-view="missing-gestor">Sem Gestor</button>
-        <button type="button" class="gv-view-tab" data-view="missing-revisor">Sem Revisor</button>
-        <button type="button" class="gv-view-tab" data-view="incomplete">Pendências</button>
-        <button type="button" class="gv-view-tab gv-view-add" title="Nova visualização">＋</button>
       </nav>
 
       <section class="gv-toolbar" aria-label="Ferramentas do quadro">
-        <button class="gv-primary" id="gvCriar" type="button">Criar material <span>⌄</span></button>
+        <button class="gv-primary" id="gvEditMode" type="button" disabled>Edição de células ativa</button>
 
         <label class="gv-tool-search">
           <span>⌕</span>
-          <input id="gvBusca" type="search" placeholder="Pesquisar" aria-label="Pesquisar item, grupo ou responsável">
+          <input id="gvBusca" type="search" placeholder="Pesquisar" aria-label="Pesquisar nas colunas carregadas">
         </label>
 
         <label class="gv-tool-control">
@@ -139,13 +135,12 @@
           </select>
         </label>
 
-        <details class="gv-tool-menu" id="gvHideMenu">
-          <summary><span>◉</span><b id="gvOcultarLabel">Ocultar</b></summary>
-          <div class="gv-menu-popover">
-            <strong>Colunas visíveis</strong>
-            <label><input id="gvHideGestor" type="checkbox" checked> Gestor de Validação</label>
-            <label><input id="gvHideRevisor" type="checkbox" checked> Revisor Validador</label>
-            <label><input id="gvHideAcao" type="checkbox" checked> Ação</label>
+        <details class="gv-tool-menu" id="gvColumnMenu">
+          <summary><span>◉</span><b id="gvColumnLabel">Colunas</b></summary>
+          <div class="gv-menu-popover gv-column-popover">
+            <strong>Colunas exibidas — máximo 12</strong>
+            <div id="gvColumnList" class="gv-column-list"></div>
+            <button id="gvApplyColumns" type="button" class="gv-menu-action">Aplicar colunas</button>
           </div>
         </details>
 
@@ -170,7 +165,7 @@
 
       <section class="gv-statusline" aria-label="Status da integração">
         <span><i class="gv-live-dot"></i><strong id="gvStatus">Conectando...</strong></span>
-        <span class="gv-controls-status"><i class="gv-controls-dot"></i><strong id="gvControlsStatus">Ativando V1.7...</strong></span>
+        <span class="gv-controls-status"><i class="gv-controls-dot"></i><strong id="gvControlsStatus">Ativando V2.0...</strong></span>
         <span id="gvBoard">Carregando...</span>
         <span><strong id="gvTotal">0</strong> itens</span>
         <span><strong id="gvExibidos">0</strong> exibidos</span>
@@ -187,18 +182,18 @@
         </div>
       </section>
 
-      <dialog id="gvCreateDialog" class="gv-dialog">
-        <form id="gvCreateForm">
+      <dialog id="gvCellDialog" class="gv-dialog">
+        <form id="gvCellForm">
           <div class="gv-dialog-head">
-            <div><small>NOVO ITEM</small><h2>Criar material</h2></div>
-            <button type="button" id="gvCreateClose" aria-label="Fechar">×</button>
+            <div><small id="gvCellType">EDITAR CÉLULA</small><h2 id="gvCellTitle">Coluna</h2></div>
+            <button type="button" id="gvCellClose" aria-label="Fechar">×</button>
           </div>
-          <label>Nome do material<input id="gvCreateName" type="text" required maxlength="255" autocomplete="off" placeholder="Digite o nome do material"></label>
-          <label>Grupo<select id="gvCreateGroup" required><option value="">Selecione um grupo</option></select></label>
-          <p>O material será criado diretamente no quadro do Monday.</p>
+          <div id="gvCellEditor" class="gv-cell-editor"></div>
+          <p id="gvCellHelp">A alteração será enviada ao Monday após confirmação.</p>
           <div class="gv-dialog-actions">
-            <button type="button" id="gvCreateCancel">Cancelar</button>
-            <button class="gv-primary" id="gvCreateSubmit" type="submit">Criar no Monday</button>
+            <button type="button" id="gvCellClear">Limpar valor</button>
+            <button type="button" id="gvCellCancel">Cancelar</button>
+            <button class="gv-primary" id="gvCellSubmit" type="submit">Salvar alteração</button>
           </div>
         </form>
       </dialog>
@@ -208,10 +203,10 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/config.js?v=20260917-v1.7-real-monday-boards"></script>
-  <script src="js/supabase.js?v=20260917-v1.7-real-monday-boards"></script>
-  <script src="js/auth.js?v=20260917-v1.7-real-monday-boards"></script>
-  <script src="js/gestao-validadores.js?v=20260917-v1.7-real-monday-boards"></script>
+  <script src="js/config.js?v=20260917-v2.0-internal-boards"></script>
+  <script src="js/supabase.js?v=20260917-v2.0-internal-boards"></script>
+  <script src="js/auth.js?v=20260917-v2.0-internal-boards"></script>
+  <script src="js/gestao-validadores.js?v=20260917-v2.0-internal-boards"></script>
   <script>
     window.setTimeout(function () {
       if (window.GV_APP_READY) return;

@@ -1,88 +1,54 @@
-# Gestão de Validadores Monday
+# Portal Operacional Monday — V2.0
 
-Aplicação independente do BI para alterar diretamente no Monday os responsáveis pelas validações.
+Aplicação interna para consultar e editar os quadros operacionais do Monday sem
+sair do site publicado no GitHub Pages.
 
-## Escopo V1.7
+## Escopo
 
-- Login via Supabase Auth.
-- Acesso restrito ao domínio `@animaeducacao.com.br`.
-- Consulta do quadro de Validação de Materiais no Monday.
-- Visual escuro e compacto inspirado no quadro do Monday.
-- Abas de pendências por Gestor e Revisor.
-- Busca global por item, grupo, gestor ou revisor.
-- Filtros por grupo e por pessoa.
-- Ordenação por item ou grupo.
-- Opção de ocultar colunas.
-- Visão agrupada ou sem agrupamento.
-- Grupos recolhíveis e carregamento progressivo de 30 itens.
-- Criação de material no grupo escolhido.
-- Alteração de `Gestor de Validação`.
-- Alteração de `Revisor Validador`.
-- Confirmação antes da gravação.
-- Menu lateral conectado aos quadros reais do mesmo workspace no Monday.
-- Abertura dos quadros do Monday em nova guia, usando a URL devolvida pela API.
-- Token do Monday armazenado somente como secret da Edge Function.
+Os itens abaixo do menu lateral carregam dentro da mesma tela:
 
-## Arquitetura
+- Oferta para Produção
+- Contratação Conteudista
+- Esteira de Produção
+- Validação de Materiais
+- Avaliação da Atuação
+- Critérios de Avaliação
+- Painéis de validação
 
-Navegador -> Supabase Auth -> Edge Function `monday-responsaveis` -> Monday API
+Cada quadro apresenta seus grupos, itens e colunas reais. O menu `Colunas`
+permite escolher até 12 colunas por vez; a limitação é apenas de exibição e
+protege o desempenho em quadros grandes. Todas as colunas do quadro continuam
+disponíveis nesse menu.
 
-O token do Monday nunca deve ser colocado em `config.js`, HTML, JavaScript do navegador ou GitHub.
+O clique no nome do item ou em uma célula editável abre um editor interno. A
+gravação só ocorre após confirmação. Fórmula, espelho, ID, registros automáticos,
+votos, controle de tempo e outros tipos que a API do Monday não permite alterar
+ficam visíveis como somente leitura.
 
-## Configuração do Supabase
+## Arquitetura e segurança
 
-Use o projeto já configurado em `js/config.js`.
+Navegador → Supabase Auth → Edge Function `monday-responsaveis` → Monday API
 
-Secrets necessários na Edge Function:
+- Login restrito ao domínio `@animaeducacao.com.br`.
+- O token do Monday permanece somente nos secrets do Supabase.
+- A função aceita apenas os sete quadros autorizados do menu.
+- O backend valida novamente quadro, item, coluna e tipo antes de gravar.
+- Nenhum token deve ser colocado em `config.js`, HTML ou JavaScript público.
 
-```bash
-supabase secrets set MONDAY_API_TOKEN="SEU_TOKEN_DO_MONDAY"
-supabase secrets set MONDAY_VALIDACAO_BOARD_ID="9433297929"
+## Secrets necessários
+
+```text
+MONDAY_API_TOKEN
+MONDAY_VALIDACAO_BOARD_ID=9433297929
 ```
 
-O ambiente do Supabase normalmente já fornece `SUPABASE_URL` e `SUPABASE_ANON_KEY` para a função.
+O ambiente do Supabase fornece `SUPABASE_URL` e `SUPABASE_ANON_KEY`.
 
-## Publicar a Edge Function
+## Publicação
 
-```bash
-supabase functions deploy monday-responsaveis --project-ref nkjmgzyjjbepebzurowy
-```
+Esta versão altera o front-end e a Edge Function. Publique primeiro
+`supabase/functions/monday-responsaveis/index.ts` e depois envie o conteúdo
+desta pasta diretamente para a raiz do repositório GitHub.
 
-Após publicar, confirme no painel do Supabase que a função aparece como
-`monday-responsaveis` e consulte os logs caso a tela informe erro de integração.
-
-## Publicação da V1.7
-
-A revisão V1.7 consulta os quadros acessíveis no mesmo workspace da Validação
-de Materiais e conecta os itens correspondentes do menu lateral às URLs reais
-devolvidas pelo Monday. A linha de status deve mostrar
-**V1.7 · quadros reais ativos**.
-
-Esta atualização altera o front-end e a Edge Function. Publique primeiro
-`supabase/functions/monday-responsaveis/index.ts` e depois envie os arquivos
-do front-end ao GitHub.
-
-Para substituir a versão contaminada, envie somente os arquivos deste pacote ao
-repositório `Gest-o-Validadores-Monday`. Não copie arquivos de outros projetos
-para a mesma pasta.
-
-## GitHub Pages
-
-Crie um repositório separado, por exemplo:
-
-`qualidadesintechtica/Gestao_Validadores_Monday`
-
-Envie o conteúdo desta pasta para a raiz do repositório e habilite GitHub Pages para a branch `main` / pasta `/root`.
-
-## Primeiro teste recomendado
-
-1. Entrar no site.
-2. Localizar um único item conhecido.
-3. Alterar somente o Revisor Validador.
-4. Confirmar a alteração.
-5. Abrir o Monday e verificar o mesmo item.
-6. Somente depois testar o Gestor de Validação.
-
-## Segurança
-
-A V1 valida o usuário tanto no navegador quanto dentro da Edge Function. A função recusa sessões inválidas e e-mails fora do domínio permitido.
+Consulte `docs/PUBLICACAO_V2_0.md` para o procedimento completo e
+`docs/PRIMEIRO_TESTE.md` para a validação controlada.

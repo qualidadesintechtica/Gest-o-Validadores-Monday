@@ -7,9 +7,10 @@ const CORS = {
 const MONDAY_URL = "https://api.monday.com/v2";
 const API_VERSION = Deno.env.get("MONDAY_API_VERSION") || "2026-07";
 const DEFAULT_BOARD_ID = 9433297929;
-const GESTOR_TITLES = ["Gestor de Validação - NQ", "Gestor de Validação", "Gestor Validacao - NQ"];
-const REVISOR_TITLES = ["Revisor Validador", "Revisor de Validação", "Revisor Validacao"];
 const ALLOWED_DOMAINS = ["animaeducacao.com.br"];
+const BOARD_PAGE_SIZE = 100;
+const ITEM_PAGE_SIZE = 500;
+const MAX_VISIBLE_COLUMNS = 12;
 const NAVIGATION_TITLES = [
   "oferta para producao",
   "contratacao conteudista",
@@ -19,6 +20,21 @@ const NAVIGATION_TITLES = [
   "criterios de avaliacao",
   "paineis de validacao",
 ];
+const READ_ONLY_TYPES = new Set([
+  "auto_number", "creation_log", "formula", "integration", "item_id",
+  "last_updated", "mirror", "progress", "subtasks", "time_tracking", "vote",
+  "button", "doc", "file", "files",
+]);
+
+type BoardLink = {
+  id: string;
+  name: string;
+  url: string;
+  workspace_id: string | null;
+  items_count?: number;
+};
+
+let navigationCache: { at: number; rootId: number; boards: BoardLink[] } | null = null;
 
 class AppError extends Error {
   status: number;
@@ -35,16 +51,12 @@ class AppError extends Error {
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: {
-      ...CORS,
-      "Content-Type": "application/json; charset=utf-8",
-      "Cache-Control": "no-store",
-    },
+    headers: { ...CORS, "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" },
   });
 }
 
-function norm(v: unknown) {
-  return String(v ?? "")
+function norm(value: unknown) {
+  return String(value ?? "")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
@@ -52,495 +64,326 @@ function norm(v: unknown) {
     .trim();
 }
 
-function boardKey(v: unknown) {
-  return norm(v).replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+function boardKey(value: unknown) {
+  return norm(value).replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function safeColumnId(value: unknown) {
+  const id = String(value ?? "").trim();
+  return /^[a-zA-Z0-9_]{1,128}$/.test(id) ? id : "";
 }
 
 async function validateUser(req: Request) {
   const auth = req.headers.get("Authorization") || "";
-  if (!auth.startsWith("Bearer ")) {
-    throw new AppError("Sessão não informada.", 401, "AUTH_MISSING");
-  }
-
+  if (!auth.startsWith("Bearer ")) throw new AppError("Sessão não informada.", 401, "AUTH_MISSING");
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY");
   if (!supabaseUrl || !anonKey) {
-    throw new AppError(
-      "Configuração de autenticação do Supabase indisponível.",
-      500,
-      "SUPABASE_CONFIG_MISSING",
-    );
+    throw new AppError("Configuração de autenticação indisponível.", 500, "SUPABASE_CONFIG_MISSING");
   }
 
   let response: Response;
   try {
-    response = await fetch(`${supabaseUrl}/auth/v1/user`, {
-      headers: { Authorization: auth, apikey: anonKey },
-    });
+    response = await fetch(`${supabaseUrl}/auth/v1/user`, { headers: { Authorization: auth, apikey: anonKey } });
   } catch (error) {
-    console.error("Falha ao validar sessão no Supabase", error);
+    console.error("Falha ao validar sessão", error);
     throw new AppError("Não foi possível validar sua sessão.", 502, "SUPABASE_AUTH_UNAVAILABLE");
   }
-
   const user = await response.json().catch(() => null);
-  if (!response.ok || !user?.email) {
-    throw new AppError("Sessão inválida ou expirada.", 401, "AUTH_INVALID");
-  }
-
+  if (!response.ok || !user?.email) throw new AppError("Sessão inválida ou expirada.", 401, "AUTH_INVALID");
   const domain = String(user.email).toLowerCase().split("@").pop();
-  if (!ALLOWED_DOMAINS.includes(domain)) {
-    throw new AppError("Usuário não autorizado para esta operação.", 403, "DOMAIN_NOT_ALLOWED");
-  }
-
+  if (!ALLOWED_DOMAINS.includes(domain)) throw new AppError("Usuário não autorizado.", 403, "DOMAIN_NOT_ALLOWED");
   return user;
 }
 
 function mondayErrorMessage(payload: any, response: Response, stage: string) {
   const errors = Array.isArray(payload?.errors) ? payload.errors : [];
-  const details = errors.map((item: any) => {
-    const message = String(item?.message || "").trim();
-    const code = String(item?.extensions?.code || item?.extensions?.error_code || "").trim();
+  const details = errors.map((entry: any) => {
+    const message = String(entry?.message || "").trim();
+    const code = String(entry?.extensions?.code || entry?.extensions?.error_code || "").trim();
     return [code, message].filter(Boolean).join(": ");
   }).filter(Boolean);
-
   const requestId = response.headers.get("x-request-id") || response.headers.get("x-amzn-trace-id") || "";
-  let detail = details.join(" | ") || `HTTP ${response.status}`;
-
-  if (/^[a-f0-9]{48,}$/i.test(detail)) {
-    detail = `falha interna (referência ${detail.slice(0, 12)}…)`;
-  }
-
-  const suffix = requestId ? ` · requisição ${requestId}` : "";
-  return `Monday API — ${stage}: ${detail}${suffix}`;
+  return `Monday API — ${stage}: ${details.join(" | ") || `HTTP ${response.status}`}${requestId ? ` · requisição ${requestId}` : ""}`;
 }
 
 async function monday(query: string, variables: Record<string, unknown> = {}, stage = "consulta") {
   const token = Deno.env.get("MONDAY_API_TOKEN");
-  if (!token) {
-    throw new AppError(
-      "Secret MONDAY_API_TOKEN não configurado no Supabase.",
-      500,
-      "MONDAY_TOKEN_MISSING",
-    );
-  }
-
+  if (!token) throw new AppError("Secret MONDAY_API_TOKEN não configurado.", 500, "MONDAY_TOKEN_MISSING");
   let response: Response;
   try {
     response = await fetch(MONDAY_URL, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": token,
-        "API-Version": API_VERSION,
-      },
+      headers: { "Content-Type": "application/json", "Authorization": token, "API-Version": API_VERSION },
       body: JSON.stringify({ query, variables }),
     });
   } catch (error) {
     console.error(`Falha de rede no Monday durante ${stage}`, error);
-    throw new AppError(
-      `Não foi possível acessar a API do Monday durante ${stage}.`,
-      502,
-      "MONDAY_UNAVAILABLE",
-    );
+    throw new AppError(`Não foi possível acessar o Monday durante ${stage}.`, 502, "MONDAY_UNAVAILABLE");
   }
-
   const raw = await response.text();
   let payload: any = null;
   try {
     payload = raw ? JSON.parse(raw) : null;
   } catch (error) {
-    console.error(`Resposta inválida do Monday durante ${stage}`, { status: response.status, error });
-    throw new AppError(
-      `Monday API — ${stage}: resposta inválida (HTTP ${response.status}).`,
-      502,
-      "MONDAY_INVALID_RESPONSE",
-    );
+    console.error("Resposta não JSON do Monday", { stage, status: response.status, error });
+    throw new AppError(`Monday API — ${stage}: resposta inválida.`, 502, "MONDAY_INVALID_RESPONSE");
   }
-
   if (!response.ok || payload?.errors?.length) {
-    throw new AppError(
-      mondayErrorMessage(payload, response, stage),
-      502,
-      "MONDAY_API_ERROR",
-    );
+    throw new AppError(mondayErrorMessage(payload, response, stage), 502, "MONDAY_API_ERROR");
   }
-
-  if (!payload?.data) {
-    throw new AppError(
-      `Monday API — ${stage}: resposta sem dados.`,
-      502,
-      "MONDAY_EMPTY_RESPONSE",
-    );
-  }
-
+  if (!payload?.data) throw new AppError(`Monday API — ${stage}: resposta sem dados.`, 502, "MONDAY_EMPTY_RESPONSE");
   return payload.data;
 }
 
-function findColumn(columns: any[], titles: string[]) {
-  const wanted = titles.map(norm);
-  return columns.find(c => wanted.includes(norm(c.title))) ||
-    columns.find(c => wanted.some(t => norm(c.title).includes(t) || t.includes(norm(c.title))));
-}
+async function loadAllowedBoards(rootBoardId: number, force = false): Promise<BoardLink[]> {
+  if (!force && navigationCache && navigationCache.rootId === rootBoardId && Date.now() - navigationCache.at < 300000) {
+    return navigationCache.boards;
+  }
+  const rootData = await monday(
+    `query ($ids: [ID!]) { boards(ids: $ids) { id name url workspace_id } }`,
+    { ids: [String(rootBoardId)] },
+    "identificação do workspace",
+  );
+  const root = rootData?.boards?.[0];
+  if (!root) throw new AppError(`Quadro principal ${rootBoardId} não encontrado.`, 502, "ROOT_BOARD_NOT_FOUND");
 
-function peopleFromValue(cv: any) {
-  const list = cv?.persons_and_teams || [];
-  return list.map((p: any) => ({ id: String(p.id), kind: p.kind || "person" }));
-}
-
-async function loadNavigationBoards(workspaceId: string | null) {
-  const boards: any[] = [];
-  const limit = 100;
-
+  const workspaceId = root.workspace_id ? String(root.workspace_id) : null;
+  const candidates: BoardLink[] = [];
   for (let page = 1; page <= 10; page++) {
-    const query = `
-      query ($page: Int!, $workspaceIds: [ID]) {
-        boards(limit: ${limit}, page: $page, state: active, workspace_ids: $workspaceIds) {
-          id
-          name
-          url
-          workspace_id
-        }
-      }
-    `;
     const data = await monday(
-      query,
+      `query ($page: Int!, $workspaceIds: [ID]) {
+        boards(limit: ${BOARD_PAGE_SIZE}, page: $page, state: active, workspace_ids: $workspaceIds) {
+          id name url workspace_id items_count
+        }
+      }`,
       { page, workspaceIds: workspaceId ? [workspaceId] : null },
-      "carregamento da navegação",
+      "carregamento dos quadros do menu",
     );
     const pageBoards = Array.isArray(data?.boards) ? data.boards : [];
-    boards.push(...pageBoards);
-    if (pageBoards.length < limit) break;
+    candidates.push(...pageBoards.map((board: any) => ({
+      id: String(board.id), name: board.name, url: board.url,
+      workspace_id: board.workspace_id ? String(board.workspace_id) : null,
+      items_count: Number(board.items_count || 0),
+    })));
+    if (pageBoards.length < BOARD_PAGE_SIZE) break;
   }
 
-  return boards
-    .filter((candidate: any) => {
-      const key = boardKey(candidate?.name);
-      return NAVIGATION_TITLES.some(title => key === title || key.includes(title));
-    })
-    .map((candidate: any) => ({
-      id: String(candidate.id),
-      name: candidate.name,
-      url: candidate.url,
-      workspace_id: candidate.workspace_id ? String(candidate.workspace_id) : null,
-    }));
+  const ordered: BoardLink[] = [];
+  const used = new Set<string>();
+  NAVIGATION_TITLES.forEach(title => {
+    candidates.forEach(candidate => {
+      const key = boardKey(candidate.name);
+      if (!used.has(candidate.id) && (key === title || key.includes(title))) {
+        used.add(candidate.id);
+        ordered.push(candidate);
+      }
+    });
+  });
+  if (!used.has(String(root.id))) {
+    ordered.push({ id: String(root.id), name: root.name, url: root.url, workspace_id: root.workspace_id ? String(root.workspace_id) : null });
+  }
+  navigationCache = { at: Date.now(), rootId: rootBoardId, boards: ordered };
+  return ordered;
 }
 
-async function bootstrap(boardId: number) {
-  const boardQuery = `
-    query ($boardId: [ID!]) {
-      boards(ids: $boardId) {
-        id
-        name
-        url
-        workspace_id
+async function allowedBoard(rootBoardId: number, requestedBoardId: number) {
+  const boards = await loadAllowedBoards(rootBoardId);
+  const board = boards.find(candidate => Number(candidate.id) === requestedBoardId);
+  if (!board) throw new AppError("Este quadro não pertence ao menu autorizado.", 403, "BOARD_NOT_ALLOWED");
+  return board;
+}
+
+async function workspaceBootstrap(rootBoardId: number) {
+  const [boards, usersData] = await Promise.all([
+    loadAllowedBoards(rootBoardId, true),
+    monday(`query { users(limit: 1000, page: 1) { id name email } }`, {}, "carregamento dos responsáveis"),
+  ]);
+  return {
+    ok: true,
+    boards,
+    users: (usersData?.users || []).map((user: any) => ({ id: String(user.id), name: user.name, email: user.email || "" })),
+    diagnostics: { api_version: API_VERSION },
+  };
+}
+
+function defaultColumns(columns: any[]) {
+  const rank = (column: any) => {
+    if (column.type === "people") return 0;
+    if (column.type === "status") return 1;
+    if (["date", "timeline", "dropdown"].includes(column.type)) return 2;
+    return 3;
+  };
+  return columns.slice().sort((a, b) => rank(a) - rank(b)).slice(0, 8).map(column => column.id);
+}
+
+async function boardData(rootBoardId: number, body: any) {
+  const requestedBoardId = Number(body?.board_id || rootBoardId);
+  if (!Number.isFinite(requestedBoardId)) throw new AppError("Board ID inválido.", 400, "INVALID_BOARD_ID");
+  await allowedBoard(rootBoardId, requestedBoardId);
+
+  const schemaData = await monday(
+    `query ($ids: [ID!]) {
+      boards(ids: $ids) {
+        id name url workspace_id items_count
         groups { id title }
-        columns { id title type }
+        columns { id title type settings }
       }
-    }
-  `;
-
-  const boardData = await monday(
-    boardQuery,
-    { boardId: [String(boardId)] },
-    "carregamento do quadro",
+    }`,
+    { ids: [String(requestedBoardId)] },
+    "carregamento da estrutura do quadro",
   );
-  const board = boardData?.boards?.[0];
-  if (!board) {
-    throw new AppError(
-      `Quadro ${boardId} não encontrado ou sem permissão para o token configurado.`,
-      502,
-      "BOARD_NOT_FOUND",
-    );
-  }
+  const board = schemaData?.boards?.[0];
+  if (!board) throw new AppError("Quadro não encontrado.", 404, "BOARD_NOT_FOUND");
 
-  const gestorCol = findColumn(board.columns || [], GESTOR_TITLES);
-  const revisorCol = findColumn(board.columns || [], REVISOR_TITLES);
-  if (!gestorCol || !revisorCol) {
-    const nomes = (board.columns || []).map((c: any) => c.title).join(", ");
-    throw new AppError(
-      `Não localizei as duas colunas de responsáveis. Colunas disponíveis: ${nomes}`,
-      422,
-      "PEOPLE_COLUMNS_NOT_FOUND",
-    );
-  }
-  if (gestorCol.type !== "people" || revisorCol.type !== "people") {
-    throw new AppError(
-      `As colunas precisam ser do tipo Pessoas no Monday. Gestor=${gestorCol.type}; Revisor=${revisorCol.type}.`,
-      422,
-      "INVALID_COLUMN_TYPE",
-    );
-  }
+  const columns = (board.columns || []).map((column: any) => ({
+    id: String(column.id), title: column.title, type: column.type,
+    settings: column.settings || {}, editable: !READ_ONLY_TYPES.has(String(column.type)),
+  }));
+  const requestedColumns = Array.isArray(body?.column_ids) ? body.column_ids.map(safeColumnId).filter(Boolean) : [];
+  const allowedIds = new Set(columns.map((column: any) => column.id));
+  let selectedIds = [...new Set(requestedColumns.filter((id: string) => allowedIds.has(id)))].slice(0, MAX_VISIBLE_COLUMNS);
+  if (!selectedIds.length) selectedIds = defaultColumns(columns);
+  if (!selectedIds.length) throw new AppError("O quadro não possui colunas disponíveis.", 422, "NO_COLUMNS");
 
-  const usersQuery = `query { users(limit: 1000, page: 1) { id name email } }`;
-  const usersData = await monday(usersQuery, {}, "carregamento dos responsáveis");
-  let navigationBoards: any[] = [];
-  try {
-    navigationBoards = await loadNavigationBoards(
-      board.workspace_id ? String(board.workspace_id) : null,
-    );
-  } catch (error) {
-    console.error("Não foi possível carregar os quadros do menu", error);
-  }
-
-  const ids = [gestorCol.id, revisorCol.id]
-    .map((id: string) => `\"${id.replace(/[^a-zA-Z0-9_]/g, "")}\"`)
-    .join(",");
-
+  const quotedIds = selectedIds.map(id => `"${id}"`).join(",");
   const fragment = `
     cursor
     items {
-      id
-      name
+      id name
       group { id title }
-      column_values(ids: [${ids}]) {
-        id
-        text
-        ... on PeopleValue { persons_and_teams { id kind } }
-      }
+      column_values(ids: [${quotedIds}]) { id text value type }
     }
   `;
-
-  const firstQuery = `
-    query ($boardId: [ID!]) {
-      boards(ids: $boardId) { items_page(limit: 500) { ${fragment} } }
-    }
-  `;
-
   const first = await monday(
-    firstQuery,
-    { boardId: [String(boardId)] },
+    `query ($ids: [ID!]) { boards(ids: $ids) { items_page(limit: ${ITEM_PAGE_SIZE}) { ${fragment} } } }`,
+    { ids: [String(requestedBoardId)] },
     "carregamento dos itens",
   );
   let page = first?.boards?.[0]?.items_page;
   const items: any[] = [...(page?.items || [])];
   let cursor = page?.cursor || null;
-  let guard = 0;
-
-  while (cursor && guard < 20) {
-    const nextQuery = `query ($cursor: String!) { next_items_page(cursor: $cursor, limit: 500) { ${fragment} } }`;
-    const next = await monday(nextQuery, { cursor }, "paginação dos itens");
+  let pagesRead = 1;
+  while (cursor && pagesRead < 21) {
+    const next = await monday(
+      `query ($cursor: String!) { next_items_page(cursor: $cursor, limit: ${ITEM_PAGE_SIZE}) { ${fragment} } }`,
+      { cursor },
+      "paginação dos itens",
+    );
     page = next?.next_items_page;
     items.push(...(page?.items || []));
     cursor = page?.cursor || null;
-    guard++;
+    pagesRead++;
   }
-
-  if (cursor) {
-    throw new AppError(
-      "O quadro ultrapassou o limite seguro de 10.500 itens desta versão.",
-      422,
-      "ITEM_PAGE_LIMIT",
-    );
-  }
-
-  const normalizedItems = items.map(item => {
-    const byId = Object.fromEntries((item.column_values || []).map((cv: any) => [cv.id, cv]));
-    const gestor = byId[gestorCol.id];
-    const revisor = byId[revisorCol.id];
-    return {
-      id: String(item.id),
-      name: item.name,
-      group_id: item.group?.id || null,
-      group_title: item.group?.title || "Sem grupo",
-      gestor_text: gestor?.text || "",
-      gestor_people: peopleFromValue(gestor),
-      revisor_text: revisor?.text || "",
-      revisor_people: peopleFromValue(revisor),
-    };
-  });
+  if (cursor) throw new AppError("O quadro excedeu o limite seguro de itens.", 422, "ITEM_PAGE_LIMIT");
 
   return {
     ok: true,
     board: {
-      id: String(board.id),
-      name: board.name,
-      url: board.url,
+      id: String(board.id), name: board.name, url: board.url,
       workspace_id: board.workspace_id ? String(board.workspace_id) : null,
-      groups: (board.groups || []).map((group: any) => ({
-        id: String(group.id),
-        title: group.title,
+      items_count: Number(board.items_count || items.length),
+      groups: (board.groups || []).map((group: any) => ({ id: String(group.id), title: group.title })),
+    },
+    columns,
+    selected_column_ids: selectedIds,
+    items: items.map(item => ({
+      id: String(item.id), name: item.name,
+      group_id: item.group?.id ? String(item.group.id) : null,
+      group_title: item.group?.title || "Sem grupo",
+      values: (item.column_values || []).map((value: any) => ({
+        id: String(value.id), type: value.type, text: value.text || "", value: value.value ?? null,
       })),
-    },
-    columns: {
-      gestor: { id: gestorCol.id, title: gestorCol.title },
-      revisor: { id: revisorCol.id, title: revisorCol.title },
-    },
-    users: (usersData?.users || []).map((u: any) => ({
-      id: String(u.id),
-      name: u.name,
-      email: u.email || "",
     })),
-    navigation: { boards: navigationBoards },
-    items: normalizedItems,
-    diagnostics: { api_version: API_VERSION, pages_read: guard + 1 },
+    diagnostics: { api_version: API_VERSION, pages_read: pagesRead },
   };
 }
 
-async function updateResponsaveis(boardId: number, body: any) {
+async function updateCell(rootBoardId: number, body: any) {
+  const boardId = Number(body?.board_id);
   const itemId = String(body?.item_id || "").trim();
-  if (!/^\d+$/.test(itemId)) {
-    throw new AppError("ID do item inválido.", 400, "INVALID_ITEM_ID");
+  const columnId = safeColumnId(body?.column_id);
+  if (!Number.isFinite(boardId) || !/^\d+$/.test(itemId) || !columnId) {
+    throw new AppError("Identificação da célula inválida.", 400, "INVALID_CELL");
   }
-
-  const columnsQuery = `
-    query ($boardId: [ID!]) {
-      boards(ids: $boardId) { columns { id title type } }
-    }
-  `;
-  const columnsData = await monday(
-    columnsQuery,
-    { boardId: [String(boardId)] },
-    "validação das colunas",
+  await allowedBoard(rootBoardId, boardId);
+  const schema = await monday(
+    `query ($ids: [ID!]) { boards(ids: $ids) { columns { id title type } } }`,
+    { ids: [String(boardId)] },
+    "validação da coluna",
   );
-  const columns = columnsData?.boards?.[0]?.columns || [];
-  const gestorCol = findColumn(columns, GESTOR_TITLES);
-  const revisorCol = findColumn(columns, REVISOR_TITLES);
-
-  if (!gestorCol || !revisorCol || gestorCol.type !== "people" || revisorCol.type !== "people") {
-    throw new AppError(
-      "As colunas oficiais de Gestor e Revisor não estão disponíveis no quadro.",
-      422,
-      "PEOPLE_COLUMNS_NOT_FOUND",
-    );
+  const column = (schema?.boards?.[0]?.columns || []).find((entry: any) => String(entry.id) === columnId);
+  if (!column) throw new AppError("Coluna não encontrada.", 404, "COLUMN_NOT_FOUND");
+  if (READ_ONLY_TYPES.has(String(column.type))) {
+    throw new AppError(`A coluna “${column.title}” é somente leitura no Monday.`, 422, "READ_ONLY_COLUMN");
   }
 
-  const gestorColumnId = String(gestorCol.id).replace(/[^a-zA-Z0-9_]/g, "");
-  const revisorColumnId = String(revisorCol.id).replace(/[^a-zA-Z0-9_]/g, "");
-
-  const makePeople = (id: unknown) => {
-    const value = String(id ?? "").trim();
-    if (value && !/^\d+$/.test(value)) {
-      throw new AppError("Responsável inválido.", 400, "INVALID_PERSON_ID");
-    }
-    return { personsAndTeams: value ? [{ id: Number(value), kind: "person" }] : [] };
-  };
-
-  const columnValues: Record<string, unknown> = {};
-  if (Object.prototype.hasOwnProperty.call(body, "gestor_user_id")) {
-    columnValues[gestorColumnId] = makePeople(body.gestor_user_id);
-  }
-  if (Object.prototype.hasOwnProperty.call(body, "revisor_user_id")) {
-    columnValues[revisorColumnId] = makePeople(body.revisor_user_id);
-  }
-  if (!Object.keys(columnValues).length) {
-    throw new AppError("Nenhuma alteração foi informada.", 400, "NO_CHANGES");
-  }
-
-  const mutation = `
-    mutation ($boardId: ID!, $itemId: ID!, $values: JSON!) {
-      change_multiple_column_values(board_id: $boardId, item_id: $itemId, column_values: $values) {
-        id
-        name
-        column_values(ids: ["${gestorColumnId}", "${revisorColumnId}"]) {
-          id
-          text
-          ... on PeopleValue { persons_and_teams { id kind } }
+  if (body?.mode === "json") {
+    const values = JSON.stringify({ [columnId]: body?.json_value ?? null });
+    const data = await monday(
+      `mutation ($boardId: ID!, $itemId: ID!, $values: JSON!) {
+        change_multiple_column_values(board_id: $boardId, item_id: $itemId, column_values: $values) {
+          id name column_values(ids: ["${columnId}"]) { id text value type }
         }
-      }
-    }
-  `;
+      }`,
+      { boardId: String(boardId), itemId, values },
+      `atualização de ${column.title}`,
+    );
+    return { ok: true, item: data?.change_multiple_column_values };
+  }
 
+  const simpleValue = String(body?.simple_value ?? "");
+  if (simpleValue.length > 20000) throw new AppError("O valor ultrapassa o limite de segurança.", 400, "VALUE_TOO_LONG");
   const data = await monday(
-    mutation,
-    {
-      boardId: String(boardId),
-      itemId,
-      values: JSON.stringify(columnValues),
-    },
-    "atualização dos responsáveis",
+    `mutation ($boardId: ID!, $itemId: ID!, $columnId: String!, $value: String!) {
+      change_simple_column_value(board_id: $boardId, item_id: $itemId, column_id: $columnId, value: $value) {
+        id name column_values(ids: [$columnId]) { id text value type }
+      }
+    }`,
+    { boardId: String(boardId), itemId, columnId, value: simpleValue },
+    `atualização de ${column.title}`,
   );
-
-  return { ok: true, item: data?.change_multiple_column_values };
+  return { ok: true, item: data?.change_simple_column_value };
 }
 
-async function createMaterial(boardId: number, body: any) {
-  const itemName = String(body?.item_name || "").replace(/\s+/g, " ").trim();
-  const groupId = String(body?.group_id || "").trim();
-
-  if (!itemName || itemName.length > 255) {
-    throw new AppError(
-      "Informe um nome de material com até 255 caracteres.",
-      400,
-      "INVALID_ITEM_NAME",
-    );
+async function updateItemName(rootBoardId: number, body: any) {
+  const boardId = Number(body?.board_id);
+  const itemId = String(body?.item_id || "").trim();
+  const name = String(body?.name || "").replace(/\s+/g, " ").trim();
+  if (!Number.isFinite(boardId) || !/^\d+$/.test(itemId) || !name || name.length > 255) {
+    throw new AppError("Nome ou item inválido.", 400, "INVALID_ITEM_NAME");
   }
-  if (!/^[a-zA-Z0-9_-]{1,128}$/.test(groupId)) {
-    throw new AppError("Grupo inválido.", 400, "INVALID_GROUP_ID");
-  }
-
-  const groupsData = await monday(
-    `query ($boardId: [ID!]) { boards(ids: $boardId) { groups { id title } } }`,
-    { boardId: [String(boardId)] },
-    "validação do grupo",
-  );
-  const groups = groupsData?.boards?.[0]?.groups || [];
-  if (!groups.some((group: any) => String(group.id) === groupId)) {
-    throw new AppError(
-      "O grupo selecionado não existe neste quadro.",
-      422,
-      "GROUP_NOT_FOUND",
-    );
-  }
-
-  const mutation = `
-    mutation ($boardId: ID!, $groupId: String!, $itemName: String!) {
-      create_item(board_id: $boardId, group_id: $groupId, item_name: $itemName) {
-        id
-        name
-        group { id title }
-      }
-    }
-  `;
+  await allowedBoard(rootBoardId, boardId);
   const data = await monday(
-    mutation,
-    { boardId: String(boardId), groupId, itemName },
-    "criação do material",
+    `mutation ($boardId: ID!, $itemId: ID!, $value: String!) {
+      change_simple_column_value(board_id: $boardId, item_id: $itemId, column_id: "name", value: $value) { id name }
+    }`,
+    { boardId: String(boardId), itemId, value: name },
+    "alteração do nome do item",
   );
-
-  if (!data?.create_item?.id) {
-    throw new AppError(
-      "O Monday não confirmou a criação do material.",
-      502,
-      "CREATE_ITEM_FAILED",
-    );
-  }
-
-  return { ok: true, item: data.create_item };
+  return { ok: true, item: data?.change_simple_column_value };
 }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
-  if (req.method !== "POST") {
-    return json({ ok: false, error: "Método não permitido.", code: "METHOD_NOT_ALLOWED" }, 405);
-  }
-
+  if (req.method !== "POST") return json({ ok: false, error: "Método não permitido.", code: "METHOD_NOT_ALLOWED" }, 405);
   try {
     await validateUser(req);
     const body = await req.json().catch(() => ({}));
-    const action = String(body?.action || "bootstrap");
-    const boardId = Number(Deno.env.get("MONDAY_VALIDACAO_BOARD_ID") || DEFAULT_BOARD_ID);
-    const requestedBoardId = Number(body?.board_id || boardId);
+    const action = String(body?.action || "workspace_bootstrap");
+    const rootBoardId = Number(Deno.env.get("MONDAY_VALIDACAO_BOARD_ID") || DEFAULT_BOARD_ID);
+    if (!Number.isFinite(rootBoardId)) throw new AppError("Board ID principal inválido.", 500, "INVALID_ROOT_BOARD");
 
-    if (!Number.isFinite(boardId) || !Number.isFinite(requestedBoardId)) {
-      throw new AppError("Board ID inválido.", 400, "INVALID_BOARD_ID");
-    }
-    if (requestedBoardId !== boardId) {
-      throw new AppError(
-        "O quadro solicitado não está autorizado para esta aplicação.",
-        403,
-        "BOARD_NOT_ALLOWED",
-      );
-    }
-
-    if (action === "bootstrap") return json(await bootstrap(boardId));
-    if (action === "update") return json(await updateResponsaveis(boardId, body));
-    if (action === "create") return json(await createMaterial(boardId, body));
+    if (action === "workspace_bootstrap") return json(await workspaceBootstrap(rootBoardId));
+    if (action === "board_data") return json(await boardData(rootBoardId, body));
+    if (action === "update_cell") return json(await updateCell(rootBoardId, body));
+    if (action === "update_item_name") return json(await updateItemName(rootBoardId, body));
     return json({ ok: false, error: "Ação inválida.", code: "INVALID_ACTION" }, 400);
-  } catch (e) {
-    console.error(e instanceof AppError ? { code: e.code, message: e.message } : e);
-    const message = e instanceof Error ? e.message : String(e);
-    const status = e instanceof AppError ? e.status : 500;
-    const code = e instanceof AppError ? e.code : "UNEXPECTED_ERROR";
+  } catch (error) {
+    console.error(error instanceof AppError ? { code: error.code, message: error.message } : error);
+    const message = error instanceof Error ? error.message : String(error);
+    const status = error instanceof AppError ? error.status : 500;
+    const code = error instanceof AppError ? error.code : "UNEXPECTED_ERROR";
     return json({ ok: false, error: message, code }, status);
   }
 });
