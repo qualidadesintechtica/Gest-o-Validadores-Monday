@@ -1,3 +1,3 @@
-V2.2.2
+V2.3
 2026-09-17
-Botão Criar título com seleção de grupo, confirmação e gravação segura no Monday
+Filtros avançados, UC/UA/Lote prioritários e carregamento progressivo dos quadros

@@ -1,4 +1,4 @@
-# Portal Operacional Monday — V2.2.2
+# Portal Operacional Monday — V2.3
 
 Aplicação interna para consultar e editar os quadros operacionais do Monday sem
 sair do site publicado no GitHub Pages.
@@ -25,7 +25,7 @@ gravação só ocorre após confirmação. Fórmula, espelho, ID, registros auto
 votos, controle de tempo e outros tipos que a API do Monday não permite alterar
 ficam visíveis como somente leitura.
 
-A descoberta V2.2.2 procura os quadros em toda a conta acessível pelo token, não
+A descoberta V2.3 procura os quadros em toda a conta acessível pelo token, não
 apenas no workspace do quadro principal. Se existirem nomes duplicados ou um
 item do menu não for um quadro, use o secret opcional `MONDAY_MENU_BOARD_IDS`
 para mapear explicitamente os IDs.
@@ -53,6 +53,29 @@ atributos de comparação vazios antes de consultar os itens.
 A aplicação continua exibindo os resultados em formato de tabela. Visualizações
 de gráfico podem carregar o filtro associado, mas o desenho específico do widget
 do Monday não é reproduzido nesta versão.
+
+## Filtros avançados
+
+O botão `Filtro` abre um painel semelhante ao do Monday. É possível escolher
+qualquer coluna do quadro, condição e valor, adicionar até 12 regras, combinar
+regras com `E` ou `OU` e criar grupos de condições. O painel mostra em tempo real
+quantos itens atendem às condições.
+
+Os filtros são aplicados dentro deste sistema e não alteram as visualizações
+salvas no Monday. Quando uma regra usa uma coluna oculta, clique em `Aplicar
+filtros`: a Edge Function carrega apenas essa coluna adicional sem obrigá-la a
+aparecer na tabela.
+
+As colunas que correspondem a `Nome da UC`, `Nome da UA` e `Lote` são incluídas
+automaticamente entre as colunas visíveis quando existirem no quadro. Colunas
+espelhadas continuam somente leitura, mas podem ser exibidas e filtradas.
+
+## Carregamento progressivo
+
+Quadros grandes não aguardam mais a leitura completa para aparecer. A primeira
+página de até 500 itens é exibida imediatamente e as páginas seguintes são
+incorporadas em segundo plano. A linha de status informa o total já carregado;
+pesquisa, filtros e edição permanecem disponíveis durante o processo.
 
 ## Criação de títulos
 
@@ -90,5 +113,5 @@ Esta versão altera o front-end e a Edge Function. Publique primeiro
 `supabase/functions/monday-responsaveis/index.ts` e depois envie o conteúdo
 desta pasta diretamente para a raiz do repositório GitHub.
 
-Consulte `docs/PUBLICACAO_V2_2_2.md` para o procedimento completo e
+Consulte `docs/PUBLICACAO_V2_3.md` para o procedimento completo e
 `docs/PRIMEIRO_TESTE.md` para a validação controlada.

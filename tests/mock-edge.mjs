@@ -33,6 +33,7 @@ const boards = boardNames.map((name, index) => ({
   items_count: 1,
 }));
 const itemPageParams = [];
+const itemQueries = [];
 
 globalThis.fetch = async (url, options = {}) => {
   if (String(url).includes("/auth/v1/user")) {
@@ -52,6 +53,9 @@ globalThis.fetch = async (url, options = {}) => {
       ...boards[3],
       groups: [{ id: "g1", title: "Grupo A" }],
       columns: [
+        { id: "uc", title: "Nome da UC", type: "text", settings: {} },
+        { id: "ua", title: "Nome da UA", type: "text", settings: {} },
+        { id: "lote", title: "Lote", type: "text", settings: {} },
         { id: "text", title: "Texto", type: "text", settings: {} },
         { id: "people", title: "Pessoa", type: "people", settings: {} },
         { id: "formula", title: "Fórmula", type: "formula", settings: {} },
@@ -69,16 +73,30 @@ globalThis.fetch = async (url, options = {}) => {
   }
   if (query.includes("items_page(limit:")) {
     itemPageParams.push(request.variables.queryParams ?? null);
+    itemQueries.push(query);
     return Response.json({ data: { boards: [{ items_page: {
-      cursor: null,
+      cursor: "cursor-1",
       items: [{
         id: "100", name: "Item de teste", group: { id: "g1", title: "Grupo A" },
         column_values: [
+          { id: "uc", text: "UC Teste", value: JSON.stringify("UC Teste"), type: "text" },
+          { id: "ua", text: "UA Teste", value: JSON.stringify("UA Teste"), type: "text" },
+          { id: "lote", text: "Lote 2", value: JSON.stringify("Lote 2"), type: "text" },
           { id: "text", text: "Valor", value: JSON.stringify("Valor"), type: "text" },
           { id: "people", text: "Pessoa", value: JSON.stringify({ personsAndTeams: [{ id: 1, kind: "person" }] }), type: "people" },
         ],
       }],
     } }] } });
+  }
+  if (query.includes("next_items_page(")) {
+    itemQueries.push(query);
+    return Response.json({ data: { next_items_page: {
+      cursor: null,
+      items: [{
+        id: "101", name: "Segundo item", group: { id: "g1", title: "Grupo A" },
+        column_values: [{ id: "text", text: "Outro", value: JSON.stringify("Outro"), type: "text" }],
+      }],
+    } } });
   }
   if (query.includes("columns { id title type }") && !query.includes("mutation")) {
     return Response.json({ data: { boards: [{ columns: [
@@ -126,8 +144,23 @@ assert.equal(bootstrap.body.boards.find(board => board.name === "Contratação C
 const data = await call({ action: "board_data", board_id: 9433297929, column_ids: ["text", "people"] });
 assert.equal(data.status, 200);
 assert.equal(data.body.items[0].name, "Item de teste");
-assert.deepEqual(data.body.selected_column_ids, ["text", "people"]);
+assert.deepEqual(data.body.selected_column_ids, ["uc", "ua", "lote", "text", "people"]);
+assert.deepEqual(data.body.context_column_ids, ["uc", "ua", "lote"]);
 assert.equal(data.body.views.length, 4);
+assert.equal(data.body.next_cursor, "cursor-1");
+assert.equal(data.body.diagnostics.progressive, true);
+
+const hiddenFilter = await call({ action: "board_data", board_id: 9433297929, column_ids: ["text"], filter_column_ids: ["people"] });
+assert.equal(hiddenFilter.status, 200);
+assert.deepEqual(hiddenFilter.body.selected_column_ids, ["uc", "ua", "lote", "text"]);
+assert.deepEqual(hiddenFilter.body.loaded_filter_column_ids, ["people"]);
+assert.ok(itemQueries.at(-1).includes('"uc","ua","lote","text","people"'));
+
+const nextPage = await call({ action: "board_page", board_id: 9433297929, cursor: "cursor-1", column_ids: ["text"], filter_column_ids: ["people"] });
+assert.equal(nextPage.status, 200);
+assert.equal(nextPage.body.items[0].name, "Segundo item");
+assert.equal(nextPage.body.next_cursor, null);
+assert.ok(itemQueries.at(-1).includes('"text","people"'));
 
 const savedView = await call({ action: "board_data", board_id: 9433297929, column_ids: ["text"], view_id: "v1" });
 assert.equal(savedView.status, 200);
@@ -175,4 +208,4 @@ const renamed = await call({ action: "update_item_name", board_id: 9433297929, i
 assert.equal(renamed.status, 200);
 assert.equal(renamed.body.item.name, "Novo nome");
 
-console.log("mock-edge: 12 cenários aprovados, incluindo filtros e criação segura de título");
+console.log("mock-edge: 14 cenários aprovados, incluindo filtros ocultos, paginação progressiva e criação segura de título");

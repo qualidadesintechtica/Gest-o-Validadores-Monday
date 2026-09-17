@@ -6,7 +6,22 @@
   const ROOT_BOARD_ID = Number(window.APP_CONFIG.BOARD_ID);
   const GROUP_PAGE_SIZE = 30;
   const MAX_VISIBLE_COLUMNS = 12;
+  const MAX_ADVANCED_FILTERS = 12;
   const GROUP_COLORS = ["#579bfc", "#00c875", "#fdab3d", "#a25ddc", "#e2445c", "#0086c0", "#cab641", "#784bd1"];
+  const FILTER_OPERATORS = [
+    { id: "contains", label: "contém" },
+    { id: "not_contains", label: "não contém" },
+    { id: "equals", label: "é" },
+    { id: "not_equals", label: "não é" },
+    { id: "is_empty", label: "está vazio", noValue: true },
+    { id: "is_not_empty", label: "não está vazio", noValue: true },
+    { id: "greater", label: "é maior que" },
+    { id: "greater_equal", label: "é maior ou igual a" },
+    { id: "less", label: "é menor que" },
+    { id: "less_equal", label: "é menor ou igual a" },
+    { id: "before", label: "é anterior a" },
+    { id: "after", label: "é posterior a" }
+  ];
 
   let state = {
     boards: [],
@@ -19,6 +34,10 @@
     activeViewId: "",
     visibleIds: [],
     items: [],
+    advancedFilterGroups: [],
+    filterGroupJoin: "and",
+    filterSequence: 0,
+    loadedFilterIds: [],
     collapsedGroups: new Set(),
     groupLimits: new Map(),
     cell: null,
@@ -121,6 +140,173 @@
     });
   }
 
+  function nextFilterId(prefix) {
+    state.filterSequence += 1;
+    return `${prefix}-${state.filterSequence}`;
+  }
+
+  function newFilterRule() {
+    return { id: nextFilterId("rule"), columnId: "__name__", operator: "contains", value: "" };
+  }
+
+  function newFilterGroup() {
+    return { id: nextFilterId("group"), operator: "and", rules: [newFilterRule()] };
+  }
+
+  function resetAdvancedFilters() {
+    state.advancedFilterGroups = [newFilterGroup()];
+    state.filterGroupJoin = "and";
+    state.loadedFilterIds = [];
+  }
+
+  function allFilterRules() {
+    return state.advancedFilterGroups.flatMap(group => group.rules || []);
+  }
+
+  function operatorNeedsValue(operator) {
+    return !FILTER_OPERATORS.find(entry => entry.id === operator)?.noValue;
+  }
+
+  function isActiveFilterRule(rule) {
+    if (!rule?.columnId || !rule?.operator) return false;
+    return !operatorNeedsValue(rule.operator) || String(rule.value ?? "").trim() !== "";
+  }
+
+  function activeFilterRules() {
+    return allFilterRules().filter(isActiveFilterRule);
+  }
+
+  function advancedFilterColumnIds() {
+    return [...new Set(activeFilterRules()
+      .map(rule => rule.columnId)
+      .filter(columnId => columnId && !columnId.startsWith("__")))]
+      .slice(0, MAX_ADVANCED_FILTERS);
+  }
+
+  function columnForFilter(columnId) {
+    if (columnId === "__name__") return { id: "__name__", title: "Nome do item", type: "name" };
+    if (columnId === "__group__") return { id: "__group__", title: "Grupo do Monday", type: "group" };
+    return state.columns.find(column => String(column.id) === String(columnId)) || null;
+  }
+
+  function filterValueFor(item, columnId) {
+    if (columnId === "__name__") return item.name || "";
+    if (columnId === "__group__") return item.group_title || "";
+    return valueFor(item, columnId).text || "";
+  }
+
+  function comparableNumber(value) {
+    const normalized = String(value ?? "").trim().replace(/\s/g, "").replace(/\.(?=\d{3}(?:\D|$))/g, "").replace(",", ".");
+    const number = Number(normalized);
+    return Number.isFinite(number) ? number : null;
+  }
+
+  function comparableDate(value) {
+    const timestamp = Date.parse(String(value ?? "").trim());
+    return Number.isFinite(timestamp) ? timestamp : null;
+  }
+
+  function matchesFilterRule(item, rule) {
+    if (!isActiveFilterRule(rule)) return true;
+    if (!rule.columnId.startsWith("__") && !state.loadedFilterIds.includes(rule.columnId)) return true;
+    const actualRaw = filterValueFor(item, rule.columnId);
+    const expectedRaw = String(rule.value ?? "");
+    const actual = norm(actualRaw);
+    const expected = norm(expectedRaw);
+    if (rule.operator === "is_empty") return !String(actualRaw ?? "").trim();
+    if (rule.operator === "is_not_empty") return Boolean(String(actualRaw ?? "").trim());
+    if (rule.operator === "contains") return actual.includes(expected);
+    if (rule.operator === "not_contains") return !actual.includes(expected);
+    if (rule.operator === "equals") return actual === expected;
+    if (rule.operator === "not_equals") return actual !== expected;
+    if (["greater", "greater_equal", "less", "less_equal"].includes(rule.operator)) {
+      const left = comparableNumber(actualRaw);
+      const right = comparableNumber(expectedRaw);
+      if (left === null || right === null) return false;
+      if (rule.operator === "greater") return left > right;
+      if (rule.operator === "greater_equal") return left >= right;
+      if (rule.operator === "less") return left < right;
+      return left <= right;
+    }
+    if (["before", "after"].includes(rule.operator)) {
+      const left = comparableDate(actualRaw);
+      const right = comparableDate(expectedRaw);
+      if (left === null || right === null) return false;
+      return rule.operator === "before" ? left < right : left > right;
+    }
+    return true;
+  }
+
+  function matchesAdvancedFilters(item) {
+    const activeGroups = state.advancedFilterGroups.map(group => ({
+      ...group,
+      rules: (group.rules || []).filter(isActiveFilterRule)
+    })).filter(group => group.rules.length);
+    if (!activeGroups.length) return true;
+    const results = activeGroups.map(group => {
+      const values = group.rules.map(rule => matchesFilterRule(item, rule));
+      return group.operator === "or" ? values.some(Boolean) : values.every(Boolean);
+    });
+    return state.filterGroupJoin === "or" ? results.some(Boolean) : results.every(Boolean);
+  }
+
+  function filterRuleLocation(ruleId) {
+    for (const group of state.advancedFilterGroups) {
+      const rule = group.rules.find(entry => entry.id === ruleId);
+      if (rule) return { group, rule };
+    }
+    return null;
+  }
+
+  function uniqueFilterValues(columnId) {
+    return [...new Set(state.items.map(item => String(filterValueFor(item, columnId) || "").trim()).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, "pt-BR"))
+      .slice(0, 100);
+  }
+
+  function renderFilterValue(rule) {
+    if (!operatorNeedsValue(rule.operator)) return '<span class="gv-filter-no-value">Nenhum valor necessário</span>';
+    const column = columnForFilter(rule.columnId);
+    const inputType = ["date", "timeline", "week"].includes(column?.type) && ["before", "after", "equals", "not_equals"].includes(rule.operator)
+      ? "date" : (["numbers", "rating"].includes(column?.type) && ["greater", "greater_equal", "less", "less_equal", "equals", "not_equals"].includes(rule.operator) ? "number" : "text");
+    const listId = `gv-values-${rule.id}`;
+    const options = uniqueFilterValues(rule.columnId).map(value => `<option value="${esc(value)}"></option>`).join("");
+    return `<span class="gv-filter-value"><input type="${inputType}" data-filter-field="value" data-rule-id="${esc(rule.id)}" value="${esc(rule.value)}" ${inputType === "text" ? `list="${listId}"` : ""} placeholder="Valor"><datalist id="${listId}">${options}</datalist></span>`;
+  }
+
+  function renderAdvancedFilters() {
+    if (!state.advancedFilterGroups.length) resetAdvancedFilters();
+    const columnOptions = [
+      { id: "__name__", title: "Nome do item", type: "item" },
+      { id: "__group__", title: "Grupo do Monday", type: "grupo" },
+      ...state.columns
+    ];
+    const html = [];
+    state.advancedFilterGroups.forEach((group, groupIndex) => {
+      if (groupIndex > 0) {
+        html.push(`<div class="gv-filter-group-join"><span>Combinar grupo anterior com</span><select data-filter-group-join aria-label="Combinação entre grupos"><option value="and" ${state.filterGroupJoin === "and" ? "selected" : ""}>E</option><option value="or" ${state.filterGroupJoin === "or" ? "selected" : ""}>OU</option></select></div>`);
+      }
+      html.push(`<section class="gv-filter-group" data-filter-group-id="${esc(group.id)}">
+        <div class="gv-filter-group-head"><strong>Grupo ${groupIndex + 1}</strong><label>Combinar regras com <select data-filter-group-operator="${esc(group.id)}"><option value="and" ${group.operator === "and" ? "selected" : ""}>E</option><option value="or" ${group.operator === "or" ? "selected" : ""}>OU</option></select></label>${state.advancedFilterGroups.length > 1 ? `<button type="button" data-remove-filter-group="${esc(group.id)}" aria-label="Excluir grupo">Excluir grupo</button>` : ""}</div>`);
+      group.rules.forEach(rule => {
+        html.push(`<div class="gv-filter-rule" data-rule-id="${esc(rule.id)}">
+          <select data-filter-field="column" data-rule-id="${esc(rule.id)}" aria-label="Coluna do filtro">${columnOptions.map(column => `<option value="${esc(column.id)}" ${column.id === rule.columnId ? "selected" : ""}>${esc(column.title)}</option>`).join("")}</select>
+          <select data-filter-field="operator" data-rule-id="${esc(rule.id)}" aria-label="Condição do filtro">${FILTER_OPERATORS.map(operator => `<option value="${operator.id}" ${operator.id === rule.operator ? "selected" : ""}>${esc(operator.label)}</option>`).join("")}</select>
+          ${renderFilterValue(rule)}
+          <button type="button" class="gv-filter-remove" data-remove-filter="${esc(rule.id)}" aria-label="Remover filtro">×</button>
+        </div>`);
+      });
+      html.push("</section>");
+    });
+    $("gvFilterGroups").innerHTML = html.join("");
+    $("gvAddFilter").disabled = allFilterRules().length >= MAX_ADVANCED_FILTERS;
+    $("gvAddFilterGroup").disabled = allFilterRules().length >= MAX_ADVANCED_FILTERS;
+  }
+
+  function filtersNeedReload() {
+    return advancedFilterColumnIds().some(columnId => !state.loadedFilterIds.includes(columnId));
+  }
+
   function filteredItems() {
     const query = norm($("gvBusca").value);
     const group = $("gvGrupo").value;
@@ -128,7 +314,7 @@
     const order = $("gvOrdenar").value;
     const rows = state.items.filter(item => {
       const text = [item.name, item.group_title, ...state.visibleIds.map(id => valueFor(item, id).text)].join(" ");
-      return (!group || item.group_title === group) && matchesPerson(item, person) && (!query || norm(text).includes(query));
+      return (!group || item.group_title === group) && matchesPerson(item, person) && matchesAdvancedFilters(item) && (!query || norm(text).includes(query));
     });
     if (order === "name-asc") rows.sort((a, b) => String(a.name).localeCompare(String(b.name), "pt-BR"));
     if (order === "name-desc") rows.sort((a, b) => String(b.name).localeCompare(String(a.name), "pt-BR"));
@@ -149,8 +335,10 @@
     const rows = filteredItems();
     $("gvExibidos").textContent = rows.length.toLocaleString("pt-BR");
     $("gvBoardCount").textContent = `${rows.length.toLocaleString("pt-BR")} ${rows.length === 1 ? "item" : "itens"}`;
-    const filterCount = [$("gvGrupo").value, $("gvPessoa").value].filter(Boolean).length;
+    const filterCount = Number(Boolean($("gvGrupo").value)) + activeFilterRules().length;
     $("gvFiltroLabel").textContent = filterCount ? `Filtro / ${filterCount}` : "Filtro";
+    $("gvFiltroControl").classList.toggle("is-active", filterCount > 0);
+    $("gvFilterResults").textContent = `Mostrando ${rows.length.toLocaleString("pt-BR")} de ${state.items.length.toLocaleString("pt-BR")} itens${filtersNeedReload() ? " · aplique para carregar colunas ocultas" : ""}`;
     $("gvOrdenarLabel").textContent = $("gvOrdenar").value === "board" ? "Ordenar" : "Ordenar / 1";
 
     const grouping = $("gvAgrupar").value;
@@ -271,7 +459,50 @@
     } catch (_error) { return []; }
   }
 
+  async function loadRemainingPages(boardId, cursor, token) {
+    let nextCursor = cursor;
+    let pagesRead = 1;
+    try {
+      while (nextCursor && pagesRead < 21 && token === state.loadToken) {
+        const payload = await call("board_page", {
+          board_id: Number(boardId),
+          cursor: nextCursor,
+          column_ids: state.visibleIds,
+          filter_column_ids: advancedFilterColumnIds()
+        });
+        if (token !== state.loadToken) return;
+        const knownIds = new Set(state.items.map(item => String(item.id)));
+        const newItems = (Array.isArray(payload.items) ? payload.items : []).filter(item => !knownIds.has(String(item.id)));
+        state.items.push(...newItems);
+        nextCursor = payload.next_cursor || null;
+        pagesRead += 1;
+        $("gvStatus").textContent = nextCursor
+          ? `Carregando ${state.items.length.toLocaleString("pt-BR")}...`
+          : "Conectado";
+        renderFilters();
+        render();
+      }
+      if (nextCursor && token === state.loadToken) {
+        $("gvStatus").textContent = "Parcial";
+        toast("O quadro ultrapassou o limite seguro de 10.000 itens. Os primeiros itens foram exibidos.", true);
+      } else if (token === state.loadToken) {
+        renderAdvancedFilters();
+      }
+    } catch (error) {
+      if (token !== state.loadToken) return;
+      console.error(error);
+      $("gvStatus").textContent = "Parcial";
+      toast(`Os primeiros ${state.items.length.toLocaleString("pt-BR")} itens foram exibidos, mas o restante não carregou: ${error.message}`, true);
+    }
+  }
+
   async function loadBoard(boardId, columnIds = null, viewId = "") {
+    const switchingBoard = state.board && String(state.board.id) !== String(boardId);
+    if (switchingBoard) {
+      resetAdvancedFilters();
+      $("gvGrupo").value = "";
+      $("gvPessoa").value = "";
+    }
     const token = ++state.loadToken;
     $("gvStatus").textContent = "Carregando...";
     $("gvBoardContent").innerHTML = '<div class="gv-loading">Carregando quadro e colunas do Monday...</div>';
@@ -280,6 +511,7 @@
       const payload = await call("board_data", {
         board_id: Number(boardId),
         column_ids: columnIds || savedColumns(boardId),
+        filter_column_ids: advancedFilterColumnIds(),
         view_id: viewId || null
       });
       if (token !== state.loadToken) return;
@@ -288,6 +520,7 @@
       state.views = Array.isArray(payload.views) ? payload.views : [];
       state.activeViewId = String(payload.active_view_id || "");
       state.visibleIds = Array.isArray(payload.selected_column_ids) ? payload.selected_column_ids : [];
+      state.loadedFilterIds = [...new Set([...state.visibleIds, ...(Array.isArray(payload.loaded_filter_column_ids) ? payload.loaded_filter_column_ids : [])])];
       state.items = Array.isArray(payload.items) ? payload.items : [];
       state.collapsedGroups = new Set();
       state.groupLimits = new Map();
@@ -297,13 +530,15 @@
       $("gvBoardSubtitle").textContent = activeView ? `Filtro salvo: ${activeView.name}` : "Edição interna das colunas do quadro";
       $("gvBoard").textContent = `${payload.board.name} · ${payload.board.id}`;
       $("gvTotal").textContent = Number(payload.board.items_count || state.items.length).toLocaleString("pt-BR");
-      $("gvStatus").textContent = "Conectado";
+      $("gvStatus").textContent = payload.next_cursor ? `Carregando ${state.items.length.toLocaleString("pt-BR")}...` : "Conectado";
       document.querySelectorAll("[data-board-id]").forEach(element => element.classList.toggle("is-active", String(element.dataset.boardId) === String(boardId)));
       renderFilters();
       renderColumnMenu();
       renderViews();
       renderCreateGroups();
+      renderAdvancedFilters();
       render();
+      if (payload.next_cursor) void loadRemainingPages(boardId, payload.next_cursor, token);
     } catch (error) {
       console.error(error);
       $("gvStatus").textContent = "Erro";
@@ -556,6 +791,80 @@
     }));
     ["gvGrupo", "gvPessoa", "gvOrdenar", "gvAgrupar"].forEach(id => $(id).addEventListener("change", resetLimitsAndRender));
 
+    $("gvAddFilter").addEventListener("click", () => {
+      if (allFilterRules().length >= MAX_ADVANCED_FILTERS) return toast(`Use no máximo ${MAX_ADVANCED_FILTERS} filtros por vez.`, true);
+      if (!state.advancedFilterGroups.length) resetAdvancedFilters();
+      state.advancedFilterGroups[state.advancedFilterGroups.length - 1].rules.push(newFilterRule());
+      renderAdvancedFilters();
+    });
+    $("gvAddFilterGroup").addEventListener("click", () => {
+      if (allFilterRules().length >= MAX_ADVANCED_FILTERS) return toast(`Use no máximo ${MAX_ADVANCED_FILTERS} filtros por vez.`, true);
+      state.advancedFilterGroups.push(newFilterGroup());
+      renderAdvancedFilters();
+    });
+    $("gvFilterGroups").addEventListener("input", event => {
+      const input = event.target.closest('[data-filter-field="value"]');
+      if (!input) return;
+      const location = filterRuleLocation(input.dataset.ruleId);
+      if (location) location.rule.value = input.value;
+      resetLimitsAndRender();
+    });
+    $("gvFilterGroups").addEventListener("change", event => {
+      const field = event.target.closest("[data-filter-field]");
+      if (field) {
+        const location = filterRuleLocation(field.dataset.ruleId);
+        if (!location) return;
+        if (field.dataset.filterField === "column") {
+          location.rule.columnId = field.value;
+          location.rule.value = "";
+        } else if (field.dataset.filterField === "operator") {
+          location.rule.operator = field.value;
+        }
+        renderAdvancedFilters();
+        resetLimitsAndRender();
+        return;
+      }
+      const groupOperator = event.target.closest("[data-filter-group-operator]");
+      if (groupOperator) {
+        const group = state.advancedFilterGroups.find(entry => entry.id === groupOperator.dataset.filterGroupOperator);
+        if (group) group.operator = groupOperator.value === "or" ? "or" : "and";
+        resetLimitsAndRender();
+        return;
+      }
+      if (event.target.matches("[data-filter-group-join]")) {
+        state.filterGroupJoin = event.target.value === "or" ? "or" : "and";
+        resetLimitsAndRender();
+      }
+    });
+    $("gvFilterGroups").addEventListener("click", event => {
+      const removeRule = event.target.closest("[data-remove-filter]");
+      if (removeRule) {
+        const location = filterRuleLocation(removeRule.dataset.removeFilter);
+        if (location) location.group.rules = location.group.rules.filter(rule => rule.id !== location.rule.id);
+        if (location && !location.group.rules.length) location.group.rules.push(newFilterRule());
+        renderAdvancedFilters();
+        resetLimitsAndRender();
+        return;
+      }
+      const removeGroup = event.target.closest("[data-remove-filter-group]");
+      if (removeGroup) {
+        state.advancedFilterGroups = state.advancedFilterGroups.filter(group => group.id !== removeGroup.dataset.removeFilterGroup);
+        if (!state.advancedFilterGroups.length) resetAdvancedFilters();
+        renderAdvancedFilters();
+        resetLimitsAndRender();
+      }
+    });
+    $("gvApplyFilters").addEventListener("click", () => {
+      if (!state.board) return;
+      loadBoard(state.board.id, state.visibleIds, state.activeViewId);
+    });
+    $("gvClearFilters").addEventListener("click", () => {
+      $("gvGrupo").value = "";
+      resetAdvancedFilters();
+      renderAdvancedFilters();
+      resetLimitsAndRender();
+    });
+
     $("gvCreateItem").addEventListener("click", () => openCreateDialog());
     $("gvCreateArrow").addEventListener("click", event => {
       event.stopPropagation();
@@ -593,7 +902,8 @@
     $("gvAtualizar").addEventListener("click", () => state.board && loadBoard(state.board.id, state.visibleIds, state.activeViewId));
     $("gvLimpar").addEventListener("click", () => {
       $("gvBusca").value = ""; $("gvGlobalBusca").value = ""; $("gvGrupo").value = "";
-      $("gvPessoa").value = ""; $("gvOrdenar").value = "board"; resetLimitsAndRender();
+      $("gvPessoa").value = ""; $("gvOrdenar").value = "board";
+      resetAdvancedFilters(); renderAdvancedFilters(); resetLimitsAndRender();
     });
     $("gvExpandir").addEventListener("click", () => { state.collapsedGroups.clear(); render(); });
     $("gvRecolher").addEventListener("click", () => {
@@ -648,7 +958,7 @@
     document.querySelectorAll([".gv-global-actions button", ".gv-side-icon", ".gv-boardnav button", ".gv-nav-item:not([data-board-target])", ".gv-star", ".gv-board-actions > button:not(.gv-logout)"].join(","))
       .forEach(button => button.addEventListener("click", () => toast(`${button.title || button.textContent.trim() || "Opção"}: este é um produto do portal Monday, não uma função de quadro disponível pela integração.`, true)));
     window.GV_APP_READY = true;
-    $("gvControlsStatus").textContent = "V2.2.2 · criação de títulos ativa";
+    $("gvControlsStatus").textContent = "V2.3 · filtros avançados ativos";
   }
 
   async function start() {

@@ -28,11 +28,11 @@ const missing = [...new Set(usedIds)].filter(id => !dynamicEditorIds.has(id) && 
 assert.deepEqual(missing, []);
 
 for (const file of [html, login, config]) {
-  assert.ok(file.includes("20260917-v2.2.2-create-item"));
+  assert.ok(file.includes("20260917-v2.3-advanced-filters"));
   assert.ok(!file.includes("v1.7-real-monday-boards"));
 }
 
-for (const action of ["workspace_bootstrap", "board_data", "create_item", "update_cell", "update_item_name"]) {
+for (const action of ["workspace_bootstrap", "board_data", "board_page", "create_item", "update_cell", "update_item_name"]) {
   assert.ok(js.includes(`\"${action}\"`));
 }
 
@@ -40,7 +40,14 @@ assert.ok(html.includes('id="gvViews"'));
 assert.ok(html.includes('id="gvCreateItem"'));
 assert.ok(html.includes('id="gvCreateDialog"'));
 assert.ok(html.includes('>Criar título</button>'));
+for (const id of ["gvFiltroControl", "gvFilterGroups", "gvAddFilter", "gvAddFilterGroup", "gvApplyFilters", "gvClearFilters", "gvFilterResults"]) {
+  assert.ok(html.includes(`id="${id}"`));
+}
 assert.ok(js.includes("activeViewId"));
+assert.ok(js.includes("matchesAdvancedFilters"));
+assert.ok(js.includes("filter_column_ids"));
+assert.ok(js.includes("loadRemainingPages"));
+assert.ok(js.includes("V2.3 · filtros avançados ativos"));
 assert.ok(!js.includes('view.type !== "FORM"'));
 
-console.log("static-frontend: navegação, filtros, criação de título e build V2.2.2 aprovados");
+console.log("static-frontend: navegação, filtros avançados, carregamento progressivo, criação de título e build V2.3 aprovados");

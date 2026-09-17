@@ -11,6 +11,8 @@ const ALLOWED_DOMAINS = ["animaeducacao.com.br"];
 const BOARD_PAGE_SIZE = 100;
 const ITEM_PAGE_SIZE = 500;
 const MAX_VISIBLE_COLUMNS = 12;
+const MAX_FILTER_COLUMNS = 12;
+const MAX_LOADED_COLUMNS = MAX_VISIBLE_COLUMNS + MAX_FILTER_COLUMNS;
 const NAVIGATION_TARGETS = [
   { label: "Oferta para Produção", aliases: ["oferta para producao"] },
   { label: "Contratação Conteudista", aliases: ["contratacao conteudista", "contratacao de conteudista"] },
@@ -382,6 +384,28 @@ async function workspaceBootstrap(rootBoardId: number) {
   };
 }
 
+function contextColumnIds(columns: any[]) {
+  const scored = columns.map((column: any, index: number) => {
+    const key = norm(column.title).replace(/[^a-z0-9]+/g, " ").trim();
+    const tokens = key.split(" ").filter(Boolean);
+    let kind = "";
+    let score = 99;
+    if (key.includes("nome da uc")) { kind = "uc"; score = 0; }
+    else if (key.includes("unidade curricular")) { kind = "uc"; score = 1; }
+    else if (tokens.includes("uc")) { kind = "uc"; score = 2; }
+    else if (key.includes("nome da ua")) { kind = "ua"; score = 10; }
+    else if (key.includes("unidade de aprendizagem")) { kind = "ua"; score = 11; }
+    else if (tokens.includes("ua")) { kind = "ua"; score = 12; }
+    else if (tokens.includes("lote") || key.startsWith("lote ")) { kind = "lote"; score = 20; }
+    return { id: String(column.id), kind, score, index };
+  }).filter(entry => entry.kind);
+  const chosen = new Map<string, string>();
+  for (const entry of scored.sort((a, b) => a.score - b.score || a.index - b.index)) {
+    if (!chosen.has(entry.kind)) chosen.set(entry.kind, entry.id);
+  }
+  return ["uc", "ua", "lote"].map(kind => chosen.get(kind)).filter(Boolean) as string[];
+}
+
 function defaultColumns(columns: any[]) {
   const rank = (column: any) => {
     if (column.type === "people") return 0;
@@ -389,7 +413,9 @@ function defaultColumns(columns: any[]) {
     if (["date", "timeline", "dropdown"].includes(column.type)) return 2;
     return 3;
   };
-  return columns.slice().sort((a, b) => rank(a) - rank(b)).slice(0, 8).map(column => column.id);
+  const contextIds = contextColumnIds(columns);
+  const otherIds = columns.slice().sort((a, b) => rank(a) - rank(b)).map(column => column.id).filter(id => !contextIds.includes(id));
+  return [...contextIds, ...otherIds].slice(0, 8);
 }
 
 async function boardData(rootBoardId: number, body: any) {
@@ -418,9 +444,16 @@ async function boardData(rootBoardId: number, body: any) {
   }));
   const requestedColumns = Array.isArray(body?.column_ids) ? body.column_ids.map(safeColumnId).filter(Boolean) : [];
   const allowedIds = new Set(columns.map((column: any) => column.id));
-  let selectedIds = [...new Set(requestedColumns.filter((id: string) => allowedIds.has(id)))].slice(0, MAX_VISIBLE_COLUMNS);
+  const contextIds = contextColumnIds(columns);
+  const validRequestedIds = requestedColumns.filter((id: string) => allowedIds.has(id));
+  let selectedIds = validRequestedIds.length
+    ? [...new Set([...contextIds, ...validRequestedIds])].slice(0, MAX_VISIBLE_COLUMNS)
+    : [];
   if (!selectedIds.length) selectedIds = defaultColumns(columns);
   if (!selectedIds.length) throw new AppError("O quadro não possui colunas disponíveis.", 422, "NO_COLUMNS");
+  const requestedFilterColumns = Array.isArray(body?.filter_column_ids) ? body.filter_column_ids.map(safeColumnId).filter(Boolean) : [];
+  const filterIds = [...new Set(requestedFilterColumns.filter((id: string) => allowedIds.has(id) && !selectedIds.includes(id)))].slice(0, MAX_FILTER_COLUMNS);
+  const loadedIds = [...selectedIds, ...filterIds].slice(0, MAX_LOADED_COLUMNS);
 
   const views = (board.views || []).map((view: any) => ({
     id: String(view.id), name: view.name, type: view.type,
@@ -436,7 +469,7 @@ async function boardData(rootBoardId: number, body: any) {
   const normalizedSort = activeView?.sort?.length ? normalizeViewSort(activeView.sort) : [];
   if (normalizedSort.length) queryParams = { ...(queryParams || {}), order_by: normalizedSort };
 
-  const quotedIds = selectedIds.map(id => `"${id}"`).join(",");
+  const quotedIds = loadedIds.map(id => `"${id}"`).join(",");
   const fragment = `
     cursor
     items {
@@ -452,22 +485,9 @@ async function boardData(rootBoardId: number, body: any) {
     { ids: [String(requestedBoardId)], queryParams },
     activeView ? `carregamento da visualização ${activeView.name}` : "carregamento dos itens",
   );
-  let page = first?.boards?.[0]?.items_page;
+  const page = first?.boards?.[0]?.items_page;
   const items: any[] = [...(page?.items || [])];
-  let cursor = page?.cursor || null;
-  let pagesRead = 1;
-  while (cursor && pagesRead < 21) {
-    const next = await monday(
-      `query ($cursor: String!) { next_items_page(cursor: $cursor, limit: ${ITEM_PAGE_SIZE}) { ${fragment} } }`,
-      { cursor },
-      "paginação dos itens",
-    );
-    page = next?.next_items_page;
-    items.push(...(page?.items || []));
-    cursor = page?.cursor || null;
-    pagesRead++;
-  }
-  if (cursor) throw new AppError("O quadro excedeu o limite seguro de itens.", 422, "ITEM_PAGE_LIMIT");
+  const cursor = page?.cursor || null;
 
   return {
     ok: true,
@@ -481,6 +501,9 @@ async function boardData(rootBoardId: number, body: any) {
     views,
     active_view_id: activeView?.id || null,
     selected_column_ids: selectedIds,
+    context_column_ids: contextIds,
+    loaded_filter_column_ids: filterIds,
+    next_cursor: cursor,
     items: items.map(item => ({
       id: String(item.id), name: item.name,
       group_id: item.group?.id ? String(item.group.id) : null,
@@ -489,7 +512,48 @@ async function boardData(rootBoardId: number, body: any) {
         id: String(value.id), type: value.type, text: value.text || "", value: value.value ?? null,
       })),
     })),
-    diagnostics: { api_version: API_VERSION, pages_read: pagesRead },
+    diagnostics: { api_version: API_VERSION, pages_read: 1, progressive: Boolean(cursor) },
+  };
+}
+
+async function boardPage(rootBoardId: number, body: any) {
+  const boardId = Number(body?.board_id);
+  const cursor = String(body?.cursor || "").trim();
+  if (!Number.isFinite(boardId) || !cursor || cursor.length > 10000) {
+    throw new AppError("Paginação do quadro inválida.", 400, "INVALID_BOARD_PAGE");
+  }
+  await allowedBoard(rootBoardId, boardId);
+  const visibleIds = Array.isArray(body?.column_ids) ? body.column_ids.map(safeColumnId).filter(Boolean).slice(0, MAX_VISIBLE_COLUMNS) : [];
+  const filterIds = Array.isArray(body?.filter_column_ids) ? body.filter_column_ids.map(safeColumnId).filter(Boolean).slice(0, MAX_FILTER_COLUMNS) : [];
+  const loadedIds = [...new Set([...visibleIds, ...filterIds])].slice(0, MAX_LOADED_COLUMNS);
+  if (!loadedIds.length) throw new AppError("Nenhuma coluna foi informada para a paginação.", 400, "NO_PAGE_COLUMNS");
+  const quotedIds = loadedIds.map(id => `"${id}"`).join(",");
+  const data = await monday(
+    `query ($cursor: String!) {
+      next_items_page(cursor: $cursor, limit: ${ITEM_PAGE_SIZE}) {
+        cursor
+        items {
+          id name
+          group { id title }
+          column_values(ids: [${quotedIds}]) { id text value type }
+        }
+      }
+    }`,
+    { cursor },
+    "carregamento progressivo dos itens",
+  );
+  const page = data?.next_items_page;
+  return {
+    ok: true,
+    next_cursor: page?.cursor || null,
+    items: (page?.items || []).map((item: any) => ({
+      id: String(item.id), name: item.name,
+      group_id: item.group?.id ? String(item.group.id) : null,
+      group_title: item.group?.title || "Sem grupo",
+      values: (item.column_values || []).map((value: any) => ({
+        id: String(value.id), type: value.type, text: value.text || "", value: value.value ?? null,
+      })),
+    })),
   };
 }
 
@@ -598,6 +662,7 @@ Deno.serve(async (req) => {
 
     if (action === "workspace_bootstrap") return json(await workspaceBootstrap(rootBoardId));
     if (action === "board_data") return json(await boardData(rootBoardId, body));
+    if (action === "board_page") return json(await boardPage(rootBoardId, body));
     if (action === "create_item") return json(await createItem(rootBoardId, body));
     if (action === "update_cell") return json(await updateCell(rootBoardId, body));
     if (action === "update_item_name") return json(await updateItemName(rootBoardId, body));
