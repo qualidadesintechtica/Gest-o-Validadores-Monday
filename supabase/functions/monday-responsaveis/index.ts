@@ -115,6 +115,11 @@ function safeColumnId(value: unknown) {
   return /^[a-zA-Z0-9_]{1,128}$/.test(id) ? id : "";
 }
 
+function safeGroupId(value: unknown) {
+  const id = String(value ?? "").trim();
+  return /^[a-zA-Z0-9_-]{1,128}$/.test(id) ? id : "";
+}
+
 function jsonObject(value: unknown) {
   if (value && typeof value === "object" && !Array.isArray(value)) return value as Record<string, unknown>;
   if (typeof value !== "string" || !value.trim()) return null;
@@ -488,6 +493,34 @@ async function boardData(rootBoardId: number, body: any) {
   };
 }
 
+async function createItem(rootBoardId: number, body: any) {
+  const boardId = Number(body?.board_id);
+  const groupId = safeGroupId(body?.group_id);
+  const itemName = String(body?.item_name || "").replace(/\s+/g, " ").trim();
+  if (!Number.isFinite(boardId) || !groupId || !itemName || itemName.length > 255) {
+    throw new AppError("Informe um nome e um grupo válidos para o novo título.", 400, "INVALID_NEW_ITEM");
+  }
+  await allowedBoard(rootBoardId, boardId);
+  const schema = await monday(
+    `query ($ids: [ID!]) { boards(ids: $ids) { groups { id title } } }`,
+    { ids: [String(boardId)] },
+    "validação do grupo do novo título",
+  );
+  const group = (schema?.boards?.[0]?.groups || []).find((entry: any) => String(entry.id) === groupId);
+  if (!group) throw new AppError("O grupo selecionado não existe mais neste quadro.", 404, "GROUP_NOT_FOUND");
+
+  const data = await monday(
+    `mutation ($boardId: ID!, $groupId: String!, $itemName: String!) {
+      create_item(board_id: $boardId, group_id: $groupId, item_name: $itemName) {
+        id name group { id title }
+      }
+    }`,
+    { boardId: String(boardId), groupId, itemName },
+    `criação do título em ${group.title}`,
+  );
+  return { ok: true, item: data?.create_item };
+}
+
 async function updateCell(rootBoardId: number, body: any) {
   const boardId = Number(body?.board_id);
   const itemId = String(body?.item_id || "").trim();
@@ -565,6 +598,7 @@ Deno.serve(async (req) => {
 
     if (action === "workspace_bootstrap") return json(await workspaceBootstrap(rootBoardId));
     if (action === "board_data") return json(await boardData(rootBoardId, body));
+    if (action === "create_item") return json(await createItem(rootBoardId, body));
     if (action === "update_cell") return json(await updateCell(rootBoardId, body));
     if (action === "update_item_name") return json(await updateItemName(rootBoardId, body));
     return json({ ok: false, error: "Ação inválida.", code: "INVALID_ACTION" }, 400);

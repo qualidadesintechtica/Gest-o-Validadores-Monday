@@ -1,3 +1,3 @@
-V2.2.1
+V2.2.2
 2026-09-17
-Correção da conversão de filtros e ordenações das visualizações salvas do Monday
+Botão Criar título com seleção de grupo, confirmação e gravação segura no Monday

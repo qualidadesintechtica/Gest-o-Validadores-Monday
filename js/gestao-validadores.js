@@ -230,6 +230,40 @@
     $("gvViews").innerHTML = buttons.join("");
   }
 
+  function closeCreatePopover() {
+    $("gvCreatePopover").hidden = true;
+    $("gvCreateArrow").setAttribute("aria-expanded", "false");
+  }
+
+  function defaultCreateGroupId(preferredId = "") {
+    const groups = Array.isArray(state.board?.groups) ? state.board.groups : [];
+    if (groups.some(group => String(group.id) === String(preferredId))) return String(preferredId);
+    const filteredGroup = $("gvGrupo").value;
+    const current = groups.find(group => String(group.title) === String(filteredGroup));
+    return String(current?.id || groups[0]?.id || "");
+  }
+
+  function renderCreateGroups() {
+    const groups = Array.isArray(state.board?.groups) ? state.board.groups : [];
+    $("gvCreateGroups").innerHTML = groups.length
+      ? groups.map(group => `<button type="button" data-create-group="${esc(group.id)}"><i style="background:${groupColor(group.title)}"></i>${esc(group.title)}</button>`).join("")
+      : '<small>Nenhum grupo disponível neste quadro.</small>';
+    $("gvCreateItem").disabled = !groups.length;
+    $("gvCreateArrow").disabled = !groups.length;
+  }
+
+  function openCreateDialog(groupId = "") {
+    if (!state.board) return toast("Nenhum quadro está aberto.", true);
+    const groups = Array.isArray(state.board.groups) ? state.board.groups : [];
+    if (!groups.length) return toast("Este quadro não possui grupo disponível para criação.", true);
+    $("gvCreateGroup").innerHTML = groups.map(group => `<option value="${esc(group.id)}">${esc(group.title)}</option>`).join("");
+    $("gvCreateGroup").value = defaultCreateGroupId(groupId);
+    $("gvCreateName").value = "";
+    closeCreatePopover();
+    $("gvCreateDialog").showModal();
+    $("gvCreateName").focus();
+  }
+
   function savedColumns(boardId) {
     try {
       const value = JSON.parse(localStorage.getItem(`gv-columns-${boardId}`) || "[]");
@@ -268,6 +302,7 @@
       renderFilters();
       renderColumnMenu();
       renderViews();
+      renderCreateGroups();
       render();
     } catch (error) {
       console.error(error);
@@ -479,6 +514,40 @@
     render();
   }
 
+  async function createItem(event) {
+    event.preventDefault();
+    if (!state.board) return;
+    const itemName = $("gvCreateName").value.replace(/\s+/g, " ").trim();
+    const groupId = $("gvCreateGroup").value;
+    const group = (state.board.groups || []).find(entry => String(entry.id) === String(groupId));
+    if (!itemName) return toast("Digite o nome do novo título.", true);
+    if (!group) return toast("Selecione um grupo válido.", true);
+    if (!confirm(`Criar “${itemName}” no grupo “${group.title}” do Monday?`)) return;
+
+    const button = $("gvCreateSubmit");
+    button.disabled = true;
+    button.textContent = "Criando...";
+    try {
+      const boardId = state.board.id;
+      const viewId = state.activeViewId;
+      const visibleIds = state.visibleIds.slice();
+      const result = await call("create_item", {
+        board_id: Number(boardId),
+        group_id: groupId,
+        item_name: itemName
+      });
+      $("gvCreateDialog").close();
+      await loadBoard(boardId, visibleIds, viewId);
+      toast(`Título “${result.item?.name || itemName}” criado no grupo “${group.title}”.`);
+    } catch (error) {
+      console.error(error);
+      toast(error.message, true);
+    } finally {
+      button.disabled = false;
+      button.textContent = "Criar título";
+    }
+  }
+
   function bindInteractions() {
     ["gvBusca", "gvGlobalBusca"].forEach(id => $(id).addEventListener("input", event => {
       const other = id === "gvBusca" ? $("gvGlobalBusca") : $("gvBusca");
@@ -486,6 +555,21 @@
       resetLimitsAndRender();
     }));
     ["gvGrupo", "gvPessoa", "gvOrdenar", "gvAgrupar"].forEach(id => $(id).addEventListener("change", resetLimitsAndRender));
+
+    $("gvCreateItem").addEventListener("click", () => openCreateDialog());
+    $("gvCreateArrow").addEventListener("click", event => {
+      event.stopPropagation();
+      const willOpen = $("gvCreatePopover").hidden;
+      $("gvCreatePopover").hidden = !willOpen;
+      $("gvCreateArrow").setAttribute("aria-expanded", willOpen ? "true" : "false");
+    });
+    $("gvCreateGroups").addEventListener("click", event => {
+      const button = event.target.closest("[data-create-group]");
+      if (button) openCreateDialog(button.dataset.createGroup);
+    });
+    document.addEventListener("click", event => {
+      if (!event.target.closest(".gv-create-wrap")) closeCreatePopover();
+    });
 
     document.querySelectorAll("[data-board-target]").forEach(element => element.addEventListener("click", () => {
       const boardId = element.dataset.boardId;
@@ -551,16 +635,20 @@
     $("gvCellForm").addEventListener("submit", saveCell);
     $("gvCellClear").addEventListener("click", event => saveCell(event, true));
     ["gvCellClose", "gvCellCancel"].forEach(id => $(id).addEventListener("click", () => { $("gvCellDialog").close(); state.cell = null; }));
+    $("gvCreateForm").addEventListener("submit", createItem);
+    ["gvCreateClose", "gvCreateCancel"].forEach(id => $(id).addEventListener("click", () => $("gvCreateDialog").close()));
     document.addEventListener("keydown", event => {
       if (event.key !== "Escape") return;
       document.querySelectorAll("details[open]").forEach(details => { details.open = false; });
+      closeCreatePopover();
+      if ($("gvCreateDialog").open) $("gvCreateDialog").close();
       if ($("gvCellDialog").open) { $("gvCellDialog").close(); state.cell = null; }
     });
 
     document.querySelectorAll([".gv-global-actions button", ".gv-side-icon", ".gv-boardnav button", ".gv-nav-item:not([data-board-target])", ".gv-star", ".gv-board-actions > button:not(.gv-logout)"].join(","))
       .forEach(button => button.addEventListener("click", () => toast(`${button.title || button.textContent.trim() || "Opção"}: este é um produto do portal Monday, não uma função de quadro disponível pela integração.`, true)));
     window.GV_APP_READY = true;
-    $("gvControlsStatus").textContent = "V2.2.1 · filtros salvos corrigidos";
+    $("gvControlsStatus").textContent = "V2.2.2 · criação de títulos ativa";
   }
 
   async function start() {

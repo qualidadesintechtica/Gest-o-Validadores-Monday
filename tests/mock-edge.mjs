@@ -64,6 +64,9 @@ globalThis.fetch = async (url, options = {}) => {
       ],
     }] } });
   }
+  if (query.includes("groups { id title }") && !query.includes("items_count")) {
+    return Response.json({ data: { boards: [{ groups: [{ id: "g1", title: "Grupo A" }] }] } });
+  }
   if (query.includes("items_page(limit:")) {
     itemPageParams.push(request.variables.queryParams ?? null);
     return Response.json({ data: { boards: [{ items_page: {
@@ -82,6 +85,12 @@ globalThis.fetch = async (url, options = {}) => {
       { id: "text", title: "Texto", type: "text" },
       { id: "formula", title: "Fórmula", type: "formula" },
     ] }] } });
+  }
+  if (query.includes("create_item(")) {
+    return Response.json({ data: { create_item: {
+      id: "101", name: request.variables.itemName,
+      group: { id: request.variables.groupId, title: "Grupo A" },
+    } } });
   }
   if (query.includes("change_multiple_column_values")) {
     return Response.json({ data: { change_multiple_column_values: { id: "100", name: "Item de teste", column_values: [{ id: "people", text: "Pessoa", value: "{}", type: "people" }] } } });
@@ -147,6 +156,14 @@ assert.equal(missingView.status, 404);
 const denied = await call({ action: "board_data", board_id: 1 });
 assert.equal(denied.status, 403);
 
+const created = await call({ action: "create_item", board_id: 9433297929, group_id: "g1", item_name: "Novo título" });
+assert.equal(created.status, 200);
+assert.equal(created.body.item.name, "Novo título");
+assert.equal(created.body.item.group.id, "g1");
+
+const invalidGroup = await call({ action: "create_item", board_id: 9433297929, group_id: "g9", item_name: "Não criar" });
+assert.equal(invalidGroup.status, 404);
+
 const readOnly = await call({ action: "update_cell", board_id: 9433297929, item_id: "100", column_id: "formula", mode: "simple", simple_value: "x" });
 assert.equal(readOnly.status, 422);
 
@@ -158,4 +175,4 @@ const renamed = await call({ action: "update_item_name", board_id: 9433297929, i
 assert.equal(renamed.status, 200);
 assert.equal(renamed.body.item.name, "Novo nome");
 
-console.log("mock-edge: 10 cenários aprovados, incluindo tabela, gráfico e formulário");
+console.log("mock-edge: 12 cenários aprovados, incluindo filtros e criação segura de título");

@@ -149,6 +149,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 .gv-primary:hover{background:var(--monday-blue-hover)}
 .gv-primary:disabled{opacity:.55;cursor:not-allowed}
 .gv-primary span{padding-left:8px;margin-left:8px;border-left:1px solid rgba(255,255,255,.32)}
+.gv-create-wrap{height:36px;display:flex;position:relative;flex:0 0 auto}
+.gv-create-main{border-radius:4px 0 0 4px}
+.gv-create-arrow{width:30px;padding:0;border-left:1px solid rgba(255,255,255,.35);border-radius:0 4px 4px 0;font-size:15px}
+.gv-create-popover{top:42px;width:260px;max-height:340px;overflow:auto}
+.gv-create-popover[hidden]{display:none}
+.gv-create-groups{display:grid;gap:3px}
+.gv-create-groups button{width:100%;display:flex;align-items:center;gap:8px}
+.gv-create-groups i{width:9px;height:9px;border-radius:50%;display:inline-block;flex:0 0 auto}
 .gv-tool-search{height:36px;display:flex;align-items:center;gap:6px;padding:0 8px;border:1px solid transparent;border-radius:4px;min-width:112px;max-width:190px;color:#c4c8d8}
 .gv-tool-search:hover,.gv-tool-search:focus-within{border-color:#8389a5;background:#222740}
 .gv-tool-search input{border:0;outline:0;background:transparent;color:#fff;min-width:0;width:100%}

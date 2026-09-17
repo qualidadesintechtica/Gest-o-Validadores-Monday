@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Portal Operacional Monday | Operação Digital</title>
-  <link rel="stylesheet" href="css/app.css?v=20260917-v2.2.1-view-normalization">
+  <link rel="stylesheet" href="css/app.css?v=20260917-v2.2.2-create-item">
 </head>
 <body>
   <div class="gv-noticebar">
@@ -108,7 +108,14 @@
       </nav>
 
       <section class="gv-toolbar" aria-label="Ferramentas do quadro">
-        <button class="gv-primary" id="gvEditMode" type="button" disabled>Edição de células ativa</button>
+        <div class="gv-create-wrap">
+          <button class="gv-primary gv-create-main" id="gvCreateItem" type="button">Criar título</button>
+          <button class="gv-primary gv-create-arrow" id="gvCreateArrow" type="button" aria-label="Escolher grupo para o novo título" aria-expanded="false">⌄</button>
+          <div class="gv-menu-popover gv-create-popover" id="gvCreatePopover" hidden>
+            <strong>Criar diretamente no grupo</strong>
+            <div id="gvCreateGroups" class="gv-create-groups"></div>
+          </div>
+        </div>
 
         <label class="gv-tool-search">
           <span>⌕</span>
@@ -165,7 +172,7 @@
 
       <section class="gv-statusline" aria-label="Status da integração">
         <span><i class="gv-live-dot"></i><strong id="gvStatus">Conectando...</strong></span>
-        <span class="gv-controls-status"><i class="gv-controls-dot"></i><strong id="gvControlsStatus">Ativando V2.2.1...</strong></span>
+        <span class="gv-controls-status"><i class="gv-controls-dot"></i><strong id="gvControlsStatus">Ativando V2.2.2...</strong></span>
         <span id="gvBoard">Carregando...</span>
         <span><strong id="gvTotal">0</strong> itens</span>
         <span><strong id="gvExibidos">0</strong> exibidos</span>
@@ -181,6 +188,26 @@
           <div class="gv-loading">Carregando dados do Monday...</div>
         </div>
       </section>
+
+      <dialog id="gvCreateDialog" class="gv-dialog">
+        <form id="gvCreateForm">
+          <div class="gv-dialog-head">
+            <div><small>NOVO ITEM</small><h2>Criar título</h2></div>
+            <button type="button" id="gvCreateClose" aria-label="Fechar">×</button>
+          </div>
+          <label>Nome do título
+            <input id="gvCreateName" type="text" maxlength="255" autocomplete="off" required placeholder="Digite o nome do novo item">
+          </label>
+          <label>Grupo do Monday
+            <select id="gvCreateGroup" required></select>
+          </label>
+          <p>O item será criado no quadro aberto. Depois você poderá preencher as demais colunas diretamente nesta tela.</p>
+          <div class="gv-dialog-actions">
+            <button type="button" id="gvCreateCancel">Cancelar</button>
+            <button class="gv-primary" id="gvCreateSubmit" type="submit">Criar título</button>
+          </div>
+        </form>
+      </dialog>
 
       <dialog id="gvCellDialog" class="gv-dialog">
         <form id="gvCellForm">
@@ -203,10 +230,10 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/config.js?v=20260917-v2.2.1-view-normalization"></script>
-  <script src="js/supabase.js?v=20260917-v2.2.1-view-normalization"></script>
-  <script src="js/auth.js?v=20260917-v2.2.1-view-normalization"></script>
-  <script src="js/gestao-validadores.js?v=20260917-v2.2.1-view-normalization"></script>
+  <script src="js/config.js?v=20260917-v2.2.2-create-item"></script>
+  <script src="js/supabase.js?v=20260917-v2.2.2-create-item"></script>
+  <script src="js/auth.js?v=20260917-v2.2.2-create-item"></script>
+  <script src="js/gestao-validadores.js?v=20260917-v2.2.2-create-item"></script>
   <script>
     window.setTimeout(function () {
       if (window.GV_APP_READY) return;
