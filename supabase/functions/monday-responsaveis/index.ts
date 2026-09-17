@@ -9,7 +9,8 @@ const API_VERSION = Deno.env.get("MONDAY_API_VERSION") || "2026-07";
 const DEFAULT_BOARD_ID = 9433297929;
 const ALLOWED_DOMAINS = ["animaeducacao.com.br"];
 const BOARD_PAGE_SIZE = 100;
-const ITEM_PAGE_SIZE = 500;
+const INITIAL_ITEM_PAGE_SIZE = 100;
+const NEXT_ITEM_PAGE_SIZE = 500;
 const MAX_VISIBLE_COLUMNS = 12;
 const MAX_FILTER_COLUMNS = 12;
 const MAX_LOADED_COLUMNS = MAX_VISIBLE_COLUMNS + MAX_FILTER_COLUMNS;
@@ -370,6 +371,11 @@ async function allowedBoard(rootBoardId: number, requestedBoardId: number) {
   return board;
 }
 
+async function authorizeBoard(rootBoardId: number, requestedBoardId: number) {
+  if (requestedBoardId === rootBoardId) return;
+  await allowedBoard(rootBoardId, requestedBoardId);
+}
+
 async function workspaceBootstrap(rootBoardId: number) {
   const [discovery, usersData] = await Promise.all([
     loadAllowedBoards(rootBoardId),
@@ -421,7 +427,7 @@ function defaultColumns(columns: any[]) {
 async function boardData(rootBoardId: number, body: any) {
   const requestedBoardId = Number(body?.board_id || rootBoardId);
   if (!Number.isFinite(requestedBoardId)) throw new AppError("Board ID inválido.", 400, "INVALID_BOARD_ID");
-  await allowedBoard(rootBoardId, requestedBoardId);
+  await authorizeBoard(rootBoardId, requestedBoardId);
 
   const schemaData = await monday(
     `query ($ids: [ID!]) {
@@ -480,7 +486,7 @@ async function boardData(rootBoardId: number, body: any) {
   `;
   const first = await monday(
     `query ($ids: [ID!], $queryParams: ItemsQuery) {
-      boards(ids: $ids) { items_page(limit: ${ITEM_PAGE_SIZE}, query_params: $queryParams) { ${fragment} } }
+      boards(ids: $ids) { items_page(limit: ${INITIAL_ITEM_PAGE_SIZE}, query_params: $queryParams) { ${fragment} } }
     }`,
     { ids: [String(requestedBoardId)], queryParams },
     activeView ? `carregamento da visualização ${activeView.name}` : "carregamento dos itens",
@@ -522,7 +528,7 @@ async function boardPage(rootBoardId: number, body: any) {
   if (!Number.isFinite(boardId) || !cursor || cursor.length > 10000) {
     throw new AppError("Paginação do quadro inválida.", 400, "INVALID_BOARD_PAGE");
   }
-  await allowedBoard(rootBoardId, boardId);
+  await authorizeBoard(rootBoardId, boardId);
   const visibleIds = Array.isArray(body?.column_ids) ? body.column_ids.map(safeColumnId).filter(Boolean).slice(0, MAX_VISIBLE_COLUMNS) : [];
   const filterIds = Array.isArray(body?.filter_column_ids) ? body.filter_column_ids.map(safeColumnId).filter(Boolean).slice(0, MAX_FILTER_COLUMNS) : [];
   const loadedIds = [...new Set([...visibleIds, ...filterIds])].slice(0, MAX_LOADED_COLUMNS);
@@ -530,7 +536,7 @@ async function boardPage(rootBoardId: number, body: any) {
   const quotedIds = loadedIds.map(id => `"${id}"`).join(",");
   const data = await monday(
     `query ($cursor: String!) {
-      next_items_page(cursor: $cursor, limit: ${ITEM_PAGE_SIZE}) {
+      next_items_page(cursor: $cursor, limit: ${NEXT_ITEM_PAGE_SIZE}) {
         cursor
         items {
           id name
@@ -564,7 +570,7 @@ async function createItem(rootBoardId: number, body: any) {
   if (!Number.isFinite(boardId) || !groupId || !itemName || itemName.length > 255) {
     throw new AppError("Informe um nome e um grupo válidos para o novo título.", 400, "INVALID_NEW_ITEM");
   }
-  await allowedBoard(rootBoardId, boardId);
+  await authorizeBoard(rootBoardId, boardId);
   const schema = await monday(
     `query ($ids: [ID!]) { boards(ids: $ids) { groups { id title } } }`,
     { ids: [String(boardId)] },
@@ -592,7 +598,7 @@ async function updateCell(rootBoardId: number, body: any) {
   if (!Number.isFinite(boardId) || !/^\d+$/.test(itemId) || !columnId) {
     throw new AppError("Identificação da célula inválida.", 400, "INVALID_CELL");
   }
-  await allowedBoard(rootBoardId, boardId);
+  await authorizeBoard(rootBoardId, boardId);
   const schema = await monday(
     `query ($ids: [ID!]) { boards(ids: $ids) { columns { id title type } } }`,
     { ids: [String(boardId)] },
@@ -639,7 +645,7 @@ async function updateItemName(rootBoardId: number, body: any) {
   if (!Number.isFinite(boardId) || !/^\d+$/.test(itemId) || !name || name.length > 255) {
     throw new AppError("Nome ou item inválido.", 400, "INVALID_ITEM_NAME");
   }
-  await allowedBoard(rootBoardId, boardId);
+  await authorizeBoard(rootBoardId, boardId);
   const data = await monday(
     `mutation ($boardId: ID!, $itemId: ID!, $value: String!) {
       change_simple_column_value(board_id: $boardId, item_id: $itemId, column_id: "name", value: $value) { id name }

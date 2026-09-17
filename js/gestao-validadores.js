@@ -7,6 +7,8 @@
   const GROUP_PAGE_SIZE = 30;
   const MAX_VISIBLE_COLUMNS = 12;
   const MAX_ADVANCED_FILTERS = 12;
+  const BOOTSTRAP_CACHE_KEY = "gv-workspace-bootstrap-v2";
+  const BOOTSTRAP_CACHE_MS = 30 * 60 * 1000;
   const GROUP_COLORS = ["#579bfc", "#00c875", "#fdab3d", "#a25ddc", "#e2445c", "#0086c0", "#cab641", "#784bd1"];
   const FILTER_OPERATORS = [
     { id: "contains", label: "contém" },
@@ -568,6 +570,31 @@
     });
   }
 
+  function applyWorkspacePayload(payload) {
+    state.boards = Array.isArray(payload?.boards) ? payload.boards : [];
+    state.missingTargets = Array.isArray(payload?.missing_targets) ? payload.missing_targets : [];
+    state.users = Array.isArray(payload?.users) ? payload.users : [];
+    state.sortedUsers = state.users.slice().sort((a, b) => userLabel(a).localeCompare(userLabel(b), "pt-BR"));
+    syncBoardMenu();
+    renderFilters();
+  }
+
+  function cachedWorkspacePayload() {
+    try {
+      const cached = JSON.parse(localStorage.getItem(BOOTSTRAP_CACHE_KEY) || "null");
+      if (!cached?.payload || Date.now() - Number(cached.at || 0) > BOOTSTRAP_CACHE_MS) return null;
+      return cached.payload;
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function cacheWorkspacePayload(payload) {
+    try {
+      localStorage.setItem(BOOTSTRAP_CACHE_KEY, JSON.stringify({ at: Date.now(), payload }));
+    } catch (_error) {}
+  }
+
   function settingsFor(column) {
     return parseJson(column?.settings, column?.settings || {});
   }
@@ -958,7 +985,7 @@
     document.querySelectorAll([".gv-global-actions button", ".gv-side-icon", ".gv-boardnav button", ".gv-nav-item:not([data-board-target])", ".gv-star", ".gv-board-actions > button:not(.gv-logout)"].join(","))
       .forEach(button => button.addEventListener("click", () => toast(`${button.title || button.textContent.trim() || "Opção"}: este é um produto do portal Monday, não uma função de quadro disponível pela integração.`, true)));
     window.GV_APP_READY = true;
-    $("gvControlsStatus").textContent = "V2.3 · filtros avançados ativos";
+    $("gvControlsStatus").textContent = "V2.3.1 · abertura rápida ativa";
   }
 
   async function start() {
@@ -979,25 +1006,22 @@
     const initials = ((parts[0]?.[0] || "U") + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
     document.querySelectorAll("[data-user-avatar]").forEach(avatar => { avatar.textContent = initials; });
 
+    const cached = cachedWorkspacePayload();
+    if (cached) applyWorkspacePayload(cached);
+
+    const initialLoad = loadBoard(ROOT_BOARD_ID);
     try {
       const payload = await call("workspace_bootstrap");
-      state.boards = Array.isArray(payload.boards) ? payload.boards : [];
-      state.missingTargets = Array.isArray(payload.missing_targets) ? payload.missing_targets : [];
-      state.users = Array.isArray(payload.users) ? payload.users : [];
-      state.sortedUsers = state.users.slice().sort((a, b) => userLabel(a).localeCompare(userLabel(b), "pt-BR"));
-      syncBoardMenu();
-      const initial = state.boards.find(board => Number(board.id) === ROOT_BOARD_ID) || state.boards.find(board => boardKey(board.name).includes("validacao de materiais")) || state.boards[0];
-      if (!initial) throw new Error("Nenhum quadro do menu foi localizado para o token configurado.");
-      await loadBoard(initial.id);
+      applyWorkspacePayload(payload);
+      cacheWorkspacePayload(payload);
       if (state.missingTargets.length) {
         toast(`${state.missingTargets.length} item(ns) do menu não apareceram como quadros na API: ${state.missingTargets.join(", ")}.`, true);
       }
     } catch (error) {
       console.error(error);
-      $("gvStatus").textContent = "Erro";
-      $("gvBoardContent").innerHTML = `<div class="gv-empty gv-empty-error">${esc(error.message)}</div>`;
-      toast(error.message, true);
+      toast("O quadro principal foi aberto, mas a atualização do menu não terminou. Tente atualizar mais tarde.", true);
     }
+    await initialLoad;
   }
 
   document.addEventListener("DOMContentLoaded", start);

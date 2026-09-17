@@ -149,6 +149,7 @@ assert.deepEqual(data.body.context_column_ids, ["uc", "ua", "lote"]);
 assert.equal(data.body.views.length, 4);
 assert.equal(data.body.next_cursor, "cursor-1");
 assert.equal(data.body.diagnostics.progressive, true);
+assert.ok(itemQueries.at(-1).includes("items_page(limit: 100"));
 
 const hiddenFilter = await call({ action: "board_data", board_id: 9433297929, column_ids: ["text"], filter_column_ids: ["people"] });
 assert.equal(hiddenFilter.status, 200);
@@ -161,6 +162,7 @@ assert.equal(nextPage.status, 200);
 assert.equal(nextPage.body.items[0].name, "Segundo item");
 assert.equal(nextPage.body.next_cursor, null);
 assert.ok(itemQueries.at(-1).includes('"text","people"'));
+assert.ok(itemQueries.at(-1).includes("next_items_page(cursor: $cursor, limit: 500"));
 
 const savedView = await call({ action: "board_data", board_id: 9433297929, column_ids: ["text"], view_id: "v1" });
 assert.equal(savedView.status, 200);
@@ -208,4 +210,4 @@ const renamed = await call({ action: "update_item_name", board_id: 9433297929, i
 assert.equal(renamed.status, 200);
 assert.equal(renamed.body.item.name, "Novo nome");
 
-console.log("mock-edge: 14 cenários aprovados, incluindo filtros ocultos, paginação progressiva e criação segura de título");
+console.log("mock-edge: 14 cenários aprovados, incluindo abertura com 100 itens, paginação de 500 e criação segura de título");

@@ -1,7 +1,7 @@
-# Primeiro teste controlado da V2.3
+# Primeiro teste controlado da V2.3.1
 
 1. Abra o sistema e faça login.
-2. Confirme a mensagem `V2.3 · filtros avançados ativos`.
+2. Confirme a mensagem `V2.3.1 · abertura rápida ativa`.
 3. Abra um quadro de teste e clique em `Criar título`.
 4. Informe um nome identificável, selecione o grupo e confirme a criação.
 5. Confirme que o título aparece no quadro principal e no Monday.
@@ -9,8 +9,8 @@
 7. Confirme que a quantidade de itens muda e que o nome do filtro aparece abaixo
    do título do quadro.
 8. Clique em `Critérios de Avaliação` e confirme que o quadro muda na mesma tela.
-9. Confirme que o primeiro lote aparece antes do término do carregamento e que o
-   status progride até `Conectado`.
+9. Confirme que aproximadamente 100 itens aparecem antes do término do menu e
+   que o status progride em lotes até `Conectado`.
 10. Confirme que Nome da UC, Nome da UA e Lote aparecem quando essas colunas
     existem no quadro.
 11. Abra `Filtro`, escolha uma coluna, uma condição e um valor e confira a

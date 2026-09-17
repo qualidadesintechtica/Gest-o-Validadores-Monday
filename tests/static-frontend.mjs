@@ -28,7 +28,7 @@ const missing = [...new Set(usedIds)].filter(id => !dynamicEditorIds.has(id) && 
 assert.deepEqual(missing, []);
 
 for (const file of [html, login, config]) {
-  assert.ok(file.includes("20260917-v2.3-advanced-filters"));
+  assert.ok(file.includes("20260917-v2.3.1-fast-start"));
   assert.ok(!file.includes("v1.7-real-monday-boards"));
 }
 
@@ -47,7 +47,9 @@ assert.ok(js.includes("activeViewId"));
 assert.ok(js.includes("matchesAdvancedFilters"));
 assert.ok(js.includes("filter_column_ids"));
 assert.ok(js.includes("loadRemainingPages"));
-assert.ok(js.includes("V2.3 · filtros avançados ativos"));
+assert.ok(js.includes("V2.3.1 · abertura rápida ativa"));
+assert.ok(js.includes("BOOTSTRAP_CACHE_MS"));
+assert.ok(js.includes("const initialLoad = loadBoard(ROOT_BOARD_ID)"));
 assert.ok(!js.includes('view.type !== "FORM"'));
 
-console.log("static-frontend: navegação, filtros avançados, carregamento progressivo, criação de título e build V2.3 aprovados");
+console.log("static-frontend: abertura rápida, filtros avançados, carregamento progressivo, criação de título e build V2.3.1 aprovados");

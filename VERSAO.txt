@@ -1,3 +1,3 @@
-V2.3
+V2.3.1
 2026-09-17
-Filtros avançados, UC/UA/Lote prioritários e carregamento progressivo dos quadros
+Abertura rápida com 100 itens, menu paralelo e carregamento progressivo
