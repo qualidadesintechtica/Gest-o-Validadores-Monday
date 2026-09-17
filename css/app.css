@@ -227,7 +227,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 .gv-show-more span{float:right;color:#b4b8c9}
 .gv-group-table .is-hidden{display:none}
 
-/* quadro dinâmico V2.1 */
+/* quadro dinâmico V2.2 */
 .gv-column-popover{width:330px;max-width:calc(100vw - 36px)}
 .gv-column-list{max-height:360px;overflow:auto;display:grid;gap:2px;padding:3px 2px;scrollbar-width:thin}
 .gv-column-list label{min-height:31px;padding:4px 6px;border-radius:4px;display:grid;grid-template-columns:18px minmax(0,1fr) auto;align-items:center;gap:7px}

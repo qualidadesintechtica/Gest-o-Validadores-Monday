@@ -115,6 +115,17 @@ function safeColumnId(value: unknown) {
   return /^[a-zA-Z0-9_]{1,128}$/.test(id) ? id : "";
 }
 
+function jsonObject(value: unknown) {
+  if (value && typeof value === "object") return value as Record<string, unknown>;
+  if (typeof value !== "string" || !value.trim()) return null;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : null;
+  } catch (_error) {
+    return null;
+  }
+}
+
 async function validateUser(req: Request) {
   const auth = req.headers.get("Authorization") || "";
   if (!auth.startsWith("Bearer ")) throw new AppError("Sessão não informada.", 401, "AUTH_MISSING");
@@ -308,6 +319,7 @@ async function boardData(rootBoardId: number, body: any) {
         id name url workspace_id items_count
         groups { id title }
         columns { id title type settings }
+        views { id name type filter sort }
       }
     }`,
     { ids: [String(requestedBoardId)] },
@@ -326,6 +338,19 @@ async function boardData(rootBoardId: number, body: any) {
   if (!selectedIds.length) selectedIds = defaultColumns(columns);
   if (!selectedIds.length) throw new AppError("O quadro não possui colunas disponíveis.", 422, "NO_COLUMNS");
 
+  const views = (board.views || []).map((view: any) => ({
+    id: String(view.id), name: view.name, type: view.type,
+    filter: jsonObject(view.filter), sort: Array.isArray(view.sort) ? view.sort : [],
+  }));
+  const requestedViewId = String(body?.view_id || "").trim();
+  const activeView = requestedViewId ? views.find((view: any) => view.id === requestedViewId) : null;
+  if (requestedViewId && !activeView) {
+    throw new AppError("A visualização selecionada não existe neste quadro.", 404, "VIEW_NOT_FOUND");
+  }
+  let queryParams: Record<string, unknown> | null = null;
+  if (activeView?.filter) queryParams = structuredClone(activeView.filter);
+  if (activeView?.sort?.length) queryParams = { ...(queryParams || {}), order_by: activeView.sort };
+
   const quotedIds = selectedIds.map(id => `"${id}"`).join(",");
   const fragment = `
     cursor
@@ -336,9 +361,11 @@ async function boardData(rootBoardId: number, body: any) {
     }
   `;
   const first = await monday(
-    `query ($ids: [ID!]) { boards(ids: $ids) { items_page(limit: ${ITEM_PAGE_SIZE}) { ${fragment} } } }`,
-    { ids: [String(requestedBoardId)] },
-    "carregamento dos itens",
+    `query ($ids: [ID!], $queryParams: ItemsQuery) {
+      boards(ids: $ids) { items_page(limit: ${ITEM_PAGE_SIZE}, query_params: $queryParams) { ${fragment} } }
+    }`,
+    { ids: [String(requestedBoardId)], queryParams },
+    activeView ? `carregamento da visualização ${activeView.name}` : "carregamento dos itens",
   );
   let page = first?.boards?.[0]?.items_page;
   const items: any[] = [...(page?.items || [])];
@@ -366,6 +393,8 @@ async function boardData(rootBoardId: number, body: any) {
       groups: (board.groups || []).map((group: any) => ({ id: String(group.id), title: group.title })),
     },
     columns,
+    views,
+    active_view_id: activeView?.id || null,
     selected_column_ids: selectedIds,
     items: items.map(item => ({
       id: String(item.id), name: item.name,

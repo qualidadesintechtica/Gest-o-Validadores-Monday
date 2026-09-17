@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Portal Operacional Monday | Operação Digital</title>
-  <link rel="stylesheet" href="css/app.css?v=20260917-v2.1-account-discovery">
+  <link rel="stylesheet" href="css/app.css?v=20260917-v2.2-saved-views">
 </head>
 <body>
   <div class="gv-noticebar">
@@ -103,8 +103,8 @@
         </div>
       </header>
 
-      <nav class="gv-views" aria-label="Visualizações do quadro">
-        <button type="button" class="gv-view-tab is-active" data-view="all">Quadro principal</button>
+      <nav class="gv-views" id="gvViews" aria-label="Visualizações e filtros salvos do quadro">
+        <button type="button" class="gv-view-tab is-active" data-view-id="">Quadro principal</button>
       </nav>
 
       <section class="gv-toolbar" aria-label="Ferramentas do quadro">
@@ -165,7 +165,7 @@
 
       <section class="gv-statusline" aria-label="Status da integração">
         <span><i class="gv-live-dot"></i><strong id="gvStatus">Conectando...</strong></span>
-        <span class="gv-controls-status"><i class="gv-controls-dot"></i><strong id="gvControlsStatus">Ativando V2.1...</strong></span>
+        <span class="gv-controls-status"><i class="gv-controls-dot"></i><strong id="gvControlsStatus">Ativando V2.2...</strong></span>
         <span id="gvBoard">Carregando...</span>
         <span><strong id="gvTotal">0</strong> itens</span>
         <span><strong id="gvExibidos">0</strong> exibidos</span>
@@ -203,10 +203,10 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/config.js?v=20260917-v2.1-account-discovery"></script>
-  <script src="js/supabase.js?v=20260917-v2.1-account-discovery"></script>
-  <script src="js/auth.js?v=20260917-v2.1-account-discovery"></script>
-  <script src="js/gestao-validadores.js?v=20260917-v2.1-account-discovery"></script>
+  <script src="js/config.js?v=20260917-v2.2-saved-views"></script>
+  <script src="js/supabase.js?v=20260917-v2.2-saved-views"></script>
+  <script src="js/auth.js?v=20260917-v2.2-saved-views"></script>
+  <script src="js/gestao-validadores.js?v=20260917-v2.2-saved-views"></script>
   <script>
     window.setTimeout(function () {
       if (window.GV_APP_READY) return;

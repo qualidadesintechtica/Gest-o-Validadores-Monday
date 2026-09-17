@@ -15,6 +15,8 @@
     sortedUsers: [],
     board: null,
     columns: [],
+    views: [],
+    activeViewId: "",
     visibleIds: [],
     items: [],
     collapsedGroups: new Set(),
@@ -216,6 +218,18 @@
     </label>`).join("");
   }
 
+  function renderViews() {
+    const savedViews = state.views.filter(view => {
+      const name = norm(view.name);
+      return view.type !== "FORM" && name !== "quadro principal" && name !== "main table" && name !== "tabela principal";
+    });
+    const buttons = [
+      `<button type="button" class="gv-view-tab ${state.activeViewId ? "" : "is-active"}" data-view-id="">Quadro principal</button>`,
+      ...savedViews.map(view => `<button type="button" class="gv-view-tab ${String(view.id) === String(state.activeViewId) ? "is-active" : ""}" data-view-id="${esc(view.id)}" title="${esc(view.type || "Visualização salva")}">${esc(view.name)}</button>`),
+    ];
+    $("gvViews").innerHTML = buttons.join("");
+  }
+
   function savedColumns(boardId) {
     try {
       const value = JSON.parse(localStorage.getItem(`gv-columns-${boardId}`) || "[]");
@@ -223,29 +237,37 @@
     } catch (_error) { return []; }
   }
 
-  async function loadBoard(boardId, columnIds = null) {
+  async function loadBoard(boardId, columnIds = null, viewId = "") {
     const token = ++state.loadToken;
     $("gvStatus").textContent = "Carregando...";
     $("gvBoardContent").innerHTML = '<div class="gv-loading">Carregando quadro e colunas do Monday...</div>';
     document.querySelectorAll("[data-board-target]").forEach(element => element.classList.remove("is-active"));
     try {
-      const payload = await call("board_data", { board_id: Number(boardId), column_ids: columnIds || savedColumns(boardId) });
+      const payload = await call("board_data", {
+        board_id: Number(boardId),
+        column_ids: columnIds || savedColumns(boardId),
+        view_id: viewId || null
+      });
       if (token !== state.loadToken) return;
       state.board = payload.board;
       state.columns = Array.isArray(payload.columns) ? payload.columns : [];
+      state.views = Array.isArray(payload.views) ? payload.views : [];
+      state.activeViewId = String(payload.active_view_id || "");
       state.visibleIds = Array.isArray(payload.selected_column_ids) ? payload.selected_column_ids : [];
       state.items = Array.isArray(payload.items) ? payload.items : [];
       state.collapsedGroups = new Set();
       state.groupLimits = new Map();
       localStorage.setItem(`gv-columns-${boardId}`, JSON.stringify(state.visibleIds));
       $("gvBoardTitle").textContent = payload.board.name;
-      $("gvBoardSubtitle").textContent = "Edição interna das colunas do quadro";
+      const activeView = state.views.find(view => String(view.id) === state.activeViewId);
+      $("gvBoardSubtitle").textContent = activeView ? `Filtro salvo: ${activeView.name}` : "Edição interna das colunas do quadro";
       $("gvBoard").textContent = `${payload.board.name} · ${payload.board.id}`;
-      $("gvTotal").textContent = state.items.length.toLocaleString("pt-BR");
+      $("gvTotal").textContent = Number(payload.board.items_count || state.items.length).toLocaleString("pt-BR");
       $("gvStatus").textContent = "Conectado";
       document.querySelectorAll("[data-board-id]").forEach(element => element.classList.toggle("is-active", String(element.dataset.boardId) === String(boardId)));
       renderFilters();
       renderColumnMenu();
+      renderViews();
       render();
     } catch (error) {
       console.error(error);
@@ -468,7 +490,7 @@
     document.querySelectorAll("[data-board-target]").forEach(element => element.addEventListener("click", () => {
       const boardId = element.dataset.boardId;
       if (!boardId) return toast(`“${element.dataset.boardTarget}” não apareceu como quadro acessível na API. Verifique se é painel/pasta, o nome real ou a permissão do token.`, true);
-      loadBoard(boardId);
+      loadBoard(boardId, null, "");
     }));
     document.querySelectorAll("[data-section-toggle]").forEach(section => section.addEventListener("click", () => {
       const name = section.dataset.sectionToggle;
@@ -482,9 +504,9 @@
       if (!selected.length) return toast("Selecione pelo menos uma coluna.", true);
       if (selected.length > MAX_VISIBLE_COLUMNS) return toast(`Selecione no máximo ${MAX_VISIBLE_COLUMNS} colunas por vez.`, true);
       $("gvColumnMenu").open = false;
-      loadBoard(state.board.id, selected);
+      loadBoard(state.board.id, selected, state.activeViewId);
     });
-    $("gvAtualizar").addEventListener("click", () => state.board && loadBoard(state.board.id, state.visibleIds));
+    $("gvAtualizar").addEventListener("click", () => state.board && loadBoard(state.board.id, state.visibleIds, state.activeViewId));
     $("gvLimpar").addEventListener("click", () => {
       $("gvBusca").value = ""; $("gvGlobalBusca").value = ""; $("gvGrupo").value = "";
       $("gvPessoa").value = ""; $("gvOrdenar").value = "board"; resetLimitsAndRender();
@@ -518,6 +540,14 @@
       }
     });
 
+    $("gvViews").addEventListener("click", event => {
+      const button = event.target.closest("[data-view-id]");
+      if (!button || !state.board) return;
+      const viewId = button.dataset.viewId || "";
+      if (viewId === state.activeViewId) return;
+      loadBoard(state.board.id, state.visibleIds, viewId);
+    });
+
     $("gvCellForm").addEventListener("submit", saveCell);
     $("gvCellClear").addEventListener("click", event => saveCell(event, true));
     ["gvCellClose", "gvCellCancel"].forEach(id => $(id).addEventListener("click", () => { $("gvCellDialog").close(); state.cell = null; }));
@@ -530,7 +560,7 @@
     document.querySelectorAll([".gv-global-actions button", ".gv-side-icon", ".gv-boardnav button", ".gv-nav-item:not([data-board-target])", ".gv-star", ".gv-board-actions > button:not(.gv-logout)"].join(","))
       .forEach(button => button.addEventListener("click", () => toast(`${button.title || button.textContent.trim() || "Opção"}: este é um produto do portal Monday, não uma função de quadro disponível pela integração.`, true)));
     window.GV_APP_READY = true;
-    $("gvControlsStatus").textContent = "V2.1 · descoberta ampliada ativa";
+    $("gvControlsStatus").textContent = "V2.2 · filtros salvos ativos";
   }
 
   async function start() {

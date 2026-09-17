@@ -1,3 +1,3 @@
-V2.1
+V2.2
 2026-09-17
-Descoberta de quadros em toda a conta e edição dinâmica de colunas
+Visualizações salvas, filtros reais do Monday e edição dinâmica de colunas

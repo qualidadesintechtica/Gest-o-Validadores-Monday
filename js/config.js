@@ -2,6 +2,6 @@ window.APP_CONFIG = {
   SUPABASE_URL: "https://nkjmgzyjjbepebzurowy.supabase.co",
   SUPABASE_PUBLISHABLE_KEY: "sb_publishable_6Tuuyz6nYSBa782OGDi1rg_XkBHmO8U",
   BOARD_ID: 9433297929,
-  BUILD_ID: "20260917-v2.1-account-discovery",
+  BUILD_ID: "20260917-v2.2-saved-views",
   DOMINIOS_PERMITIDOS: ["animaeducacao.com.br"]
 };

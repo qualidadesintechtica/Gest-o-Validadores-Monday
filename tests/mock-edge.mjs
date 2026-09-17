@@ -55,6 +55,10 @@ globalThis.fetch = async (url, options = {}) => {
         { id: "people", title: "Pessoa", type: "people", settings: {} },
         { id: "formula", title: "Fórmula", type: "formula", settings: {} },
       ],
+      views: [
+        { id: "v0", name: "Quadro principal", type: "TABLE", filter: null, sort: [] },
+        { id: "v1", name: "26.1 SET/25 a DEZ/25", type: "TABLE", filter: { rules: [{ column_id: "text", compare_value: ["Valor"], operator: "contains_text" }], operator: "and" }, sort: [{ column_id: "name", direction: "asc" }] },
+      ],
     }] } });
   }
   if (query.includes("items_page(limit:")) {
@@ -110,6 +114,15 @@ const data = await call({ action: "board_data", board_id: 9433297929, column_ids
 assert.equal(data.status, 200);
 assert.equal(data.body.items[0].name, "Item de teste");
 assert.deepEqual(data.body.selected_column_ids, ["text", "people"]);
+assert.equal(data.body.views.length, 2);
+
+const savedView = await call({ action: "board_data", board_id: 9433297929, column_ids: ["text"], view_id: "v1" });
+assert.equal(savedView.status, 200);
+assert.equal(savedView.body.active_view_id, "v1");
+assert.equal(savedView.body.items.length, 1);
+
+const missingView = await call({ action: "board_data", board_id: 9433297929, view_id: "inexistente" });
+assert.equal(missingView.status, 404);
 
 const denied = await call({ action: "board_data", board_id: 1 });
 assert.equal(denied.status, 403);
@@ -125,4 +138,4 @@ const renamed = await call({ action: "update_item_name", board_id: 9433297929, i
 assert.equal(renamed.status, 200);
 assert.equal(renamed.body.item.name, "Novo nome");
 
-console.log("mock-edge: 6 cenários aprovados");
+console.log("mock-edge: 8 cenários aprovados");
