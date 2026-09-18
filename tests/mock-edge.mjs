@@ -10,6 +10,7 @@ globalThis.Deno = {
         MONDAY_VALIDACAO_BOARD_ID: "9433297929",
         SUPABASE_URL: "https://supabase.test",
         SUPABASE_ANON_KEY: "test-anon",
+        SUPABASE_SERVICE_ROLE_KEY: "service-role-test",
       }[name];
     },
   },
@@ -34,10 +35,35 @@ const boards = boardNames.map((name, index) => ({
 }));
 const itemPageParams = [];
 const itemQueries = [];
+const auditAccessRows = [];
+const auditChangeRows = [];
+
+function storedAuditRow(body, rows) {
+  const row = typeof body === "string" ? JSON.parse(body) : body;
+  return { id: rows.length + 1, criado_em: new Date(Date.now() + rows.length).toISOString(), ...row };
+}
 
 globalThis.fetch = async (url, options = {}) => {
   if (String(url).includes("/auth/v1/user")) {
-    return Response.json({ email: "teste@animaeducacao.com.br" });
+    return Response.json({
+      id: "user-1",
+      email: "teste@animaeducacao.com.br",
+      user_metadata: { full_name: "Pessoa Teste" },
+    });
+  }
+  if (String(url).includes("/rest/v1/gv_acessos")) {
+    if (String(options.method || "GET").toUpperCase() === "POST") {
+      auditAccessRows.push(storedAuditRow(options.body, auditAccessRows));
+      return new Response(null, { status: 201 });
+    }
+    return Response.json(auditAccessRows.slice().reverse());
+  }
+  if (String(url).includes("/rest/v1/gv_alteracoes")) {
+    if (String(options.method || "GET").toUpperCase() === "POST") {
+      auditChangeRows.push(storedAuditRow(options.body, auditChangeRows));
+      return new Response(null, { status: 201 });
+    }
+    return Response.json(auditChangeRows.slice().reverse());
   }
   const request = JSON.parse(options.body || "{}");
   const query = request.query || "";
@@ -69,7 +95,7 @@ globalThis.fetch = async (url, options = {}) => {
     }] } });
   }
   if (query.includes("groups { id title }") && !query.includes("items_count")) {
-    return Response.json({ data: { boards: [{ groups: [{ id: "g1", title: "Grupo A" }] }] } });
+    return Response.json({ data: { boards: [{ id: boards[3].id, name: boards[3].name, groups: [{ id: "g1", title: "Grupo A" }] }] } });
   }
   if (query.includes("items_page(limit:")) {
     itemPageParams.push(request.variables.queryParams ?? null);
@@ -99,10 +125,22 @@ globalThis.fetch = async (url, options = {}) => {
     } } });
   }
   if (query.includes("columns { id title type }") && !query.includes("mutation")) {
-    return Response.json({ data: { boards: [{ columns: [
-      { id: "text", title: "Texto", type: "text" },
-      { id: "formula", title: "Fórmula", type: "formula" },
-    ] }] } });
+    return Response.json({ data: {
+      boards: [{ id: boards[3].id, name: boards[3].name, columns: [
+        { id: "text", title: "Texto", type: "text" },
+        { id: "formula", title: "Fórmula", type: "formula" },
+      ] }],
+      items: [{
+        id: "100", name: "Item de teste", group: { id: "g1", title: "Grupo A" },
+        column_values: [{ id: "text", text: "Valor anterior", value: JSON.stringify("Valor anterior"), type: "text" }],
+      }],
+    } });
+  }
+  if (query.includes("items(ids: $itemIds)") && !query.includes("columns")) {
+    return Response.json({ data: {
+      boards: [{ id: boards[3].id, name: boards[3].name }],
+      items: [{ id: "100", name: "Item de teste", group: { id: "g1", title: "Grupo A" } }],
+    } });
   }
   if (query.includes("create_item(")) {
     return Response.json({ data: { create_item: {
@@ -140,6 +178,14 @@ assert.equal(bootstrap.body.boards.length, 7);
 assert.equal(bootstrap.body.missing_targets.length, 0);
 assert.equal(bootstrap.body.diagnostics.boards_scanned, 7);
 assert.equal(bootstrap.body.boards.find(board => board.name === "Contratação Conteudista").menu_target, "Contratação Conteudista");
+
+const logged = await call({
+  action: "log_access", event_type: "acesso_sistema", board_id: 9433297929,
+  board_name: "Validação de Materiais", page: "/index.html", build_id: "teste-v2.4",
+});
+assert.equal(logged.status, 200);
+assert.equal(logged.body.audit_saved, true);
+assert.equal(auditAccessRows[0].usuario_email, "teste@animaeducacao.com.br");
 
 const data = await call({ action: "board_data", board_id: 9433297929, column_ids: ["text", "people"] });
 assert.equal(data.status, 200);
@@ -195,6 +241,8 @@ const created = await call({ action: "create_item", board_id: 9433297929, group_
 assert.equal(created.status, 200);
 assert.equal(created.body.item.name, "Novo título");
 assert.equal(created.body.item.group.id, "g1");
+assert.equal(created.body.audit_saved, true);
+assert.equal(auditChangeRows.at(-1).acao, "criar_item");
 
 const invalidGroup = await call({ action: "create_item", board_id: 9433297929, group_id: "g9", item_name: "Não criar" });
 assert.equal(invalidGroup.status, 404);
@@ -205,9 +253,20 @@ assert.equal(readOnly.status, 422);
 const updated = await call({ action: "update_cell", board_id: 9433297929, item_id: "100", column_id: "text", mode: "simple", simple_value: "Novo" });
 assert.equal(updated.status, 200);
 assert.equal(updated.body.item.column_values[0].text, "Novo");
+assert.equal(updated.body.audit_saved, true);
+assert.equal(auditChangeRows.at(-1).valor_anterior.text, "Valor anterior");
+assert.equal(auditChangeRows.at(-1).valor_novo.text, "Novo");
 
 const renamed = await call({ action: "update_item_name", board_id: 9433297929, item_id: "100", name: "Novo nome" });
 assert.equal(renamed.status, 200);
 assert.equal(renamed.body.item.name, "Novo nome");
+assert.equal(renamed.body.audit_saved, true);
+assert.equal(auditChangeRows.at(-1).valor_anterior.text, "Item de teste");
 
-console.log("mock-edge: 14 cenários aprovados, incluindo abertura com 100 itens, paginação de 500 e criação segura de título");
+const report = await call({ action: "audit_report", from: "2020-01-01T00:00:00.000Z", to: "2030-01-01T00:00:00.000Z" });
+assert.equal(report.status, 200);
+assert.equal(report.body.accesses.length, 1);
+assert.equal(report.body.changes.length, 5);
+assert.equal(report.body.changes[0].usuario_nome, "Pessoa Teste");
+
+console.log("mock-edge: 16 cenários aprovados, incluindo paginação, criação, auditoria de acesso, valores anterior/novo e relatório");

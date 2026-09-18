@@ -36,6 +36,7 @@
   }
 
   async function sair() {
+    sessionStorage.removeItem("gv-audit-access-logged-v2");
     await window.appSupabase.auth.signOut();
     window.location.replace("login.html");
   }

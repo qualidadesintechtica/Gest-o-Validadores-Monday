@@ -6,6 +6,8 @@ const html = fs.readFileSync(new URL("index.html", root), "utf8");
 const login = fs.readFileSync(new URL("login.html", root), "utf8");
 const js = fs.readFileSync(new URL("js/gestao-validadores.js", root), "utf8");
 const config = fs.readFileSync(new URL("js/config.js", root), "utf8");
+const edge = fs.readFileSync(new URL("supabase/functions/monday-responsaveis/index.ts", root), "utf8");
+const migration = fs.readFileSync(new URL("supabase/migrations/20260918_gv_auditoria.sql", root), "utf8");
 
 const targets = [...html.matchAll(/data-board-target="([^"]+)"/g)].map(match => match[1]);
 assert.equal(targets.length, 7);
@@ -28,12 +30,13 @@ const missing = [...new Set(usedIds)].filter(id => !dynamicEditorIds.has(id) && 
 assert.deepEqual(missing, []);
 
 for (const file of [html, login, config]) {
-  assert.ok(file.includes("20260917-v2.3.1-fast-start"));
+  assert.ok(file.includes("20260918-v2.4-audit-reports"));
   assert.ok(!file.includes("v1.7-real-monday-boards"));
 }
 
-for (const action of ["workspace_bootstrap", "board_data", "board_page", "create_item", "update_cell", "update_item_name"]) {
+for (const action of ["workspace_bootstrap", "board_data", "board_page", "create_item", "update_cell", "update_item_name", "log_access", "audit_report"]) {
   assert.ok(js.includes(`\"${action}\"`));
+  assert.ok(edge.includes(`\"${action}\"`));
 }
 
 assert.ok(html.includes('id="gvViews"'));
@@ -47,9 +50,19 @@ assert.ok(js.includes("activeViewId"));
 assert.ok(js.includes("matchesAdvancedFilters"));
 assert.ok(js.includes("filter_column_ids"));
 assert.ok(js.includes("loadRemainingPages"));
-assert.ok(js.includes("V2.3.1 · abertura rápida ativa"));
+assert.ok(js.includes("V2.4 · auditoria ativa"));
 assert.ok(js.includes("BOOTSTRAP_CACHE_MS"));
 assert.ok(js.includes("const initialLoad = loadBoard(ROOT_BOARD_ID)"));
 assert.ok(!js.includes('view.type !== "FORM"'));
+for (const id of [
+  "gvAuditReports", "gvAuditView", "gvAuditFrom", "gvAuditTo", "gvAuditUser",
+  "gvAuditAction", "gvAuditApply", "gvAuditExport", "gvAuditTable",
+]) assert.ok(html.includes(`id="${id}"`));
+assert.ok(js.includes("exportAuditCsv"));
+assert.ok(js.includes("valor_anterior"));
+assert.ok(js.includes("valor_novo"));
+assert.ok(migration.includes("create table if not exists public.gv_acessos"));
+assert.ok(migration.includes("create table if not exists public.gv_alteracoes"));
+assert.ok(migration.includes("enable row level security"));
 
-console.log("static-frontend: abertura rápida, filtros avançados, carregamento progressivo, criação de título e build V2.3.1 aprovados");
+console.log("static-frontend: V2.4 aprovada com abertura rápida, filtros, edição, relatórios, CSV e migração de auditoria");

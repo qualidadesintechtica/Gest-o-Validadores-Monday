@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Portal Operacional Monday | Operação Digital</title>
-  <link rel="stylesheet" href="css/app.css?v=20260917-v2.3.1-fast-start">
+  <link rel="stylesheet" href="css/app.css?v=20260918-v2.4-audit-reports">
 </head>
 <body>
   <div class="gv-noticebar">
@@ -77,6 +77,7 @@
         <div class="gv-nav-item" data-section-item="validacao" data-board-target="Critérios de Avaliação"><span>♧</span> Critérios de Avaliação</div>
         <div class="gv-nav-item" data-section-item="validacao" data-board-target="Painéis de validação"><span>▣</span> ☑ Painéis de validação</div>
         <div class="gv-nav-section"><span>›</span> PAINÉIS</div>
+        <div class="gv-nav-item" id="gvAuditReports"><span>▤</span> Relatórios de auditoria</div>
       </div>
     </aside>
 
@@ -191,11 +192,41 @@
 
       <section class="gv-statusline" aria-label="Status da integração">
         <span><i class="gv-live-dot"></i><strong id="gvStatus">Conectando...</strong></span>
-        <span class="gv-controls-status"><i class="gv-controls-dot"></i><strong id="gvControlsStatus">Ativando V2.3.1...</strong></span>
+        <span class="gv-controls-status"><i class="gv-controls-dot"></i><strong id="gvControlsStatus">Ativando V2.4...</strong></span>
         <span id="gvBoard">Carregando...</span>
         <span><strong id="gvTotal">0</strong> itens</span>
         <span><strong id="gvExibidos">0</strong> exibidos</span>
         <span class="gv-sync-note">Alterações são enviadas ao Monday após confirmação</span>
+      </section>
+
+      <section class="gv-audit-view" id="gvAuditView" hidden aria-label="Relatórios de auditoria">
+        <header class="gv-audit-header">
+          <div><small>RELATÓRIOS</small><h2>Acessos e alterações por usuário</h2><p>Dados registrados a partir da publicação da V2.4.</p></div>
+          <button id="gvAuditBack" type="button">← Voltar ao quadro</button>
+        </header>
+
+        <div class="gv-audit-filters">
+          <label>Data inicial<input id="gvAuditFrom" type="date"></label>
+          <label>Data final<input id="gvAuditTo" type="date"></label>
+          <label>Usuário<select id="gvAuditUser"><option value="">Todos os usuários</option></select></label>
+          <label>Ação<select id="gvAuditAction" disabled><option value="">Todas as ações</option><option value="criar_item">Criação de título</option><option value="alterar_coluna">Alteração de coluna</option><option value="alterar_nome">Alteração de nome</option></select></label>
+          <button class="gv-primary" id="gvAuditApply" type="button">Atualizar relatório</button>
+          <button id="gvAuditExport" type="button">Exportar CSV</button>
+        </div>
+
+        <div class="gv-audit-cards">
+          <article><span>Acessos</span><strong id="gvAuditAccessCount">0</strong><small>no período</small></article>
+          <article><span>Usuários que acessaram</span><strong id="gvAuditAccessUsers">0</strong><small>pessoas distintas</small></article>
+          <article><span>Alterações</span><strong id="gvAuditChangeCount">0</strong><small>operações registradas</small></article>
+          <article><span>Usuários que alteraram</span><strong id="gvAuditChangeUsers">0</strong><small>pessoas distintas</small></article>
+        </div>
+
+        <nav class="gv-audit-tabs" aria-label="Tipos de relatório">
+          <button type="button" class="is-active" data-audit-tab="accesses">Acessos</button>
+          <button type="button" data-audit-tab="changes">Alterações</button>
+        </nav>
+        <div class="gv-audit-info"><span id="gvAuditStatus">Selecione o período e atualize.</span><span id="gvAuditLimit"></span></div>
+        <div class="gv-audit-table-wrap" id="gvAuditTable"></div>
       </section>
 
       <section class="gv-board-card">
@@ -249,10 +280,10 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/config.js?v=20260917-v2.3.1-fast-start"></script>
-  <script src="js/supabase.js?v=20260917-v2.3.1-fast-start"></script>
-  <script src="js/auth.js?v=20260917-v2.3.1-fast-start"></script>
-  <script src="js/gestao-validadores.js?v=20260917-v2.3.1-fast-start"></script>
+  <script src="js/config.js?v=20260918-v2.4-audit-reports"></script>
+  <script src="js/supabase.js?v=20260918-v2.4-audit-reports"></script>
+  <script src="js/auth.js?v=20260918-v2.4-audit-reports"></script>
+  <script src="js/gestao-validadores.js?v=20260918-v2.4-audit-reports"></script>
   <script>
     window.setTimeout(function () {
       if (window.GV_APP_READY) return;

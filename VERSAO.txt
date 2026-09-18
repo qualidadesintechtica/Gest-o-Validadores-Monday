@@ -1,3 +1,3 @@
-V2.3.1
-2026-09-17
-Abertura rápida com 100 itens, menu paralelo e carregamento progressivo
+V2.4
+2026-09-18
+Relatórios de acesso e alterações por usuário, com auditoria e exportação CSV

@@ -326,6 +326,46 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 .gv-toast{position:fixed;right:24px;bottom:24px;max-width:440px;background:#0073ea;color:#fff;padding:13px 16px;border-radius:6px;box-shadow:var(--shadow);z-index:100;font-size:12px}
 .gv-toast.error{background:var(--red)}
 
+/* relatórios e auditoria V2.4 */
+body.gv-report-mode .gv-views,
+body.gv-report-mode .gv-toolbar,
+body.gv-report-mode .gv-statusline,
+body.gv-report-mode .gv-board-card{display:none}
+.gv-audit-view[hidden]{display:none!important}
+.gv-audit-view{min-height:0;flex:1;overflow:auto;padding:18px 8px 34px;scrollbar-width:thin;color:#eef0f6}
+.gv-audit-header{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding:0 4px 17px;border-bottom:1px solid var(--line)}
+.gv-audit-header small{color:#7db9f4;font-size:9px;letter-spacing:.1em}
+.gv-audit-header h2{margin:5px 0 3px;font-size:22px}
+.gv-audit-header p{margin:0;color:#aeb2c4;font-size:11px}
+.gv-audit-header button,.gv-audit-filters>button:not(.gv-primary){height:36px;border:1px solid #656c88;border-radius:4px;background:#252b46;color:#fff;padding:0 13px;cursor:pointer}
+.gv-audit-header button:hover,.gv-audit-filters>button:not(.gv-primary):hover{background:#343a58}
+.gv-audit-filters{display:grid;grid-template-columns:145px 145px minmax(180px,1fr) minmax(170px,1fr) auto auto;gap:9px;align-items:end;padding:16px 4px}
+.gv-audit-filters label{display:grid;gap:5px;color:#bfc3d2;font-size:10px}
+.gv-audit-filters input,.gv-audit-filters select{height:36px;border:1px solid #626984;border-radius:4px;background:#252b46;color:#fff;padding:0 9px;outline:0;min-width:0}
+.gv-audit-filters input:focus,.gv-audit-filters select:focus{border-color:#71b3f6}
+.gv-audit-filters option{background:#252a44;color:#fff}
+.gv-audit-cards{display:grid;grid-template-columns:repeat(4,minmax(145px,1fr));gap:10px;padding:0 4px 16px}
+.gv-audit-cards article{min-height:94px;border:1px solid #454c68;border-radius:7px;background:#242a45;padding:13px;display:grid;align-content:center;gap:3px}
+.gv-audit-cards span{color:#bbc0d0;font-size:11px}
+.gv-audit-cards strong{font-size:26px;color:#fff}
+.gv-audit-cards small{color:#8f95aa;font-size:9px}
+.gv-audit-tabs{display:flex;gap:4px;border-bottom:1px solid #454b65;padding:0 4px}
+.gv-audit-tabs button{height:39px;border:0;background:transparent;color:#bfc3d1;padding:0 15px;cursor:pointer;position:relative}
+.gv-audit-tabs button:hover{background:#252b46}
+.gv-audit-tabs button.is-active{color:#fff;font-weight:600}
+.gv-audit-tabs button.is-active:after{content:"";position:absolute;height:2px;background:#579bfc;left:8px;right:8px;bottom:-1px}
+.gv-audit-info{min-height:38px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 8px;color:#9da2b7;font-size:10px}
+.gv-audit-table-wrap{overflow:auto;border:1px solid #454b65;border-radius:6px;scrollbar-width:thin}
+.gv-audit-table{width:100%;border-collapse:collapse;min-width:980px;background:#222741}
+.gv-audit-table th,.gv-audit-table td{border-right:1px solid #414760;border-bottom:1px solid #414760;padding:9px 10px;text-align:left;vertical-align:top}
+.gv-audit-table th{position:sticky;top:0;z-index:2;background:#2c324f;color:#f0f1f5;font-size:10px;white-space:nowrap}
+.gv-audit-table td{color:#d8dae4;font-size:10px;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gv-audit-table tbody tr:hover td{background:#2c324d}
+.gv-audit-table td small{display:block;color:#8f95aa;margin-top:3px}
+.gv-audit-action{display:inline-flex;align-items:center;min-height:22px;border-radius:11px;background:#324769;color:#b9dcff;padding:0 8px;font-size:9px}
+.gv-audit-value{display:block;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#fff}
+.gv-audit-empty{padding:42px 15px;text-align:center;color:#9ca1b5}
+
 @media(max-width:1250px){
   .gv-shell{grid-template-columns:60px 230px minmax(0,1fr)}
   .gv-main{padding-left:14px;padding-right:14px}
@@ -333,6 +373,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
   .gv-toolbar>*{flex:0 0 auto}
   .gv-sync-note{display:none!important}
   .gv-filter-popover{position:fixed;top:218px;left:300px;transform:none;width:calc(100vw - 320px);max-height:calc(100vh - 235px)}
+  .gv-audit-filters{grid-template-columns:repeat(3,minmax(150px,1fr))}
 }
 
 @media(max-width:850px){
@@ -356,4 +397,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
   .gv-filter-rule{grid-template-columns:1fr}
   .gv-filter-remove{justify-self:end}
   .gv-quick-filter{grid-template-columns:1fr}
+  .gv-audit-header{display:grid}
+  .gv-audit-filters{grid-template-columns:1fr 1fr}
+  .gv-audit-cards{grid-template-columns:1fr 1fr}
 }

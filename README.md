@@ -1,4 +1,4 @@
-# Portal Operacional Monday — V2.3.1
+# Portal Operacional Monday — V2.4
 
 Aplicação interna para consultar e editar os quadros operacionais do Monday sem
 sair do site publicado no GitHub Pages.
@@ -25,7 +25,7 @@ gravação só ocorre após confirmação. Fórmula, espelho, ID, registros auto
 votos, controle de tempo e outros tipos que a API do Monday não permite alterar
 ficam visíveis como somente leitura.
 
-A descoberta V2.3.1 procura os quadros em toda a conta acessível pelo token, não
+A descoberta procura os quadros em toda a conta acessível pelo token, não
 apenas no workspace do quadro principal. Se existirem nomes duplicados ou um
 item do menu não for um quadro, use o secret opcional `MONDAY_MENU_BOARD_IDS`
 para mapear explicitamente os IDs.
@@ -90,14 +90,37 @@ criação só é enviada ao Monday depois da confirmação da pessoa usuária. A
 criação, a visualização atual é recarregada; se o item não atender ao filtro
 salvo ativo, ele estará disponível em `Quadro principal`.
 
+## Relatórios de acesso e alterações
+
+O item `Relatórios de auditoria`, no menu lateral, apresenta dois relatórios
+internos sem redirecionar para o Monday:
+
+- acessos por usuário, data, quadro e versão publicada;
+- alterações por usuário, quadro, item e coluna, incluindo valor anterior,
+  valor novo, status e mensagem de erro quando a operação falha.
+
+O painel permite filtrar por período, usuário e tipo de ação, mostra totais de
+usuários distintos e exporta o resultado visível em CSV. A criação de títulos,
+a alteração do nome do item e a edição das colunas são auditadas pela Edge
+Function usando a identidade validada no Supabase Auth.
+
+Os registros começam a ser produzidos depois da publicação da V2.4; operações
+anteriores não podem ser reconstruídas retroativamente. Os relatórios são
+consultados somente quando a pessoa abre essa área, portanto não aumentam o
+tempo de carregamento dos quadros. O registro inicial de acesso é enviado em
+segundo plano.
+
 ## Arquitetura e segurança
 
-Navegador → Supabase Auth → Edge Function `monday-responsaveis` → Monday API
+Navegador → Supabase Auth → Edge Function `monday-responsaveis` → Monday API e tabelas de auditoria
 
 - Login restrito ao domínio `@animaeducacao.com.br`.
 - O token do Monday permanece somente nos secrets do Supabase.
 - A função aceita apenas os sete quadros autorizados do menu.
 - O backend valida novamente quadro, item, coluna e tipo antes de gravar.
+- As tabelas de auditoria usam RLS e não são liberadas diretamente para o
+  navegador; somente a Edge Function usa a credencial administrativa nativa do
+  projeto para gravar e consultar os registros.
 - Nenhum token deve ser colocado em `config.js`, HTML ou JavaScript público.
 
 ## Secrets necessários
@@ -107,13 +130,20 @@ MONDAY_API_TOKEN
 MONDAY_VALIDACAO_BOARD_ID=9433297929
 ```
 
-O ambiente do Supabase fornece `SUPABASE_URL` e `SUPABASE_ANON_KEY`.
+O ambiente do Supabase fornece `SUPABASE_URL`, `SUPABASE_ANON_KEY` e
+`SUPABASE_SERVICE_ROLE_KEY`. Não copie a service role para o GitHub.
+
+Opcionalmente, defina `GV_REPORT_ADMIN_EMAILS` com uma lista separada por
+vírgulas para restringir quem pode abrir os relatórios. Sem esse secret, todos
+os usuários autenticados do domínio permitido podem consultá-los.
 
 ## Publicação
 
-Esta versão altera o front-end e a Edge Function. Publique primeiro
-`supabase/functions/monday-responsaveis/index.ts` e depois envie o conteúdo
-desta pasta diretamente para a raiz do repositório GitHub.
+Esta versão altera banco, Edge Function e front-end. A ordem obrigatória é:
 
-Consulte `docs/PUBLICACAO_V2_3_1.md` para o procedimento completo e
+1. executar `supabase/migrations/20260918_gv_auditoria.sql` no SQL Editor;
+2. publicar `supabase/functions/monday-responsaveis/index.ts`;
+3. enviar o conteúdo desta pasta diretamente para a raiz do GitHub.
+
+Consulte `docs/PUBLICACAO_V2_4.md` para o procedimento completo e
 `docs/PRIMEIRO_TESTE.md` para a validação controlada.

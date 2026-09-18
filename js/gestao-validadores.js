@@ -40,6 +40,7 @@
     filterGroupJoin: "and",
     filterSequence: 0,
     loadedFilterIds: [],
+    audit: { activeTab: "accesses", accesses: [], changes: [], loaded: false, truncated: false },
     collapsedGroups: new Set(),
     groupLimits: new Map(),
     cell: null,
@@ -761,7 +762,9 @@
       $("gvCellDialog").close();
       state.cell = null;
       render();
-      toast("Alteração salva no Monday com sucesso.");
+      toast(result.audit_saved === false
+        ? "Alteração salva no Monday, mas o registro de auditoria falhou. Verifique a migração SQL."
+        : "Alteração salva e registrada na auditoria com sucesso.", result.audit_saved === false);
     } catch (error) {
       console.error(error);
       toast(error.message, true);
@@ -800,7 +803,9 @@
       });
       $("gvCreateDialog").close();
       await loadBoard(boardId, visibleIds, viewId);
-      toast(`Título “${result.item?.name || itemName}” criado no grupo “${group.title}”.`);
+      toast(result.audit_saved === false
+        ? `Título criado no Monday, mas o registro de auditoria falhou. Verifique a migração SQL.`
+        : `Título “${result.item?.name || itemName}” criado e registrado na auditoria.`, result.audit_saved === false);
     } catch (error) {
       console.error(error);
       toast(error.message, true);
@@ -810,7 +815,212 @@
     }
   }
 
+  function localDateValue(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  function setDefaultAuditPeriod() {
+    if ($("gvAuditFrom").value && $("gvAuditTo").value) return;
+    const to = new Date();
+    const from = new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
+    $("gvAuditFrom").value = localDateValue(from);
+    $("gvAuditTo").value = localDateValue(to);
+  }
+
+  function formatDateTime(value) {
+    const date = new Date(value);
+    return Number.isFinite(date.getTime()) ? date.toLocaleString("pt-BR") : "—";
+  }
+
+  function actionLabel(action) {
+    return ({
+      criar_item: "Criação de título",
+      alterar_coluna: "Alteração de coluna",
+      alterar_nome: "Alteração de nome"
+    })[action] || String(action || "Operação");
+  }
+
+  function formatAuditValue(value) {
+    if (value === null || value === undefined) return "—";
+    if (typeof value === "object" && "text" in value && String(value.text || "").trim()) return String(value.text);
+    if (typeof value === "object") {
+      try { return JSON.stringify(value); } catch (_error) { return String(value); }
+    }
+    return String(value);
+  }
+
+  function filteredAuditRows(type) {
+    const user = $("gvAuditUser").value;
+    const action = $("gvAuditAction").value;
+    const rows = type === "changes" ? state.audit.changes : state.audit.accesses;
+    return rows.filter(row => (!user || norm(row.usuario_email) === norm(user)) &&
+      (type !== "changes" || !action || row.acao === action));
+  }
+
+  function renderAuditUsers() {
+    const current = $("gvAuditUser").value;
+    const people = new Map();
+    [...state.audit.accesses, ...state.audit.changes].forEach(row => {
+      const email = String(row.usuario_email || "").trim().toLowerCase();
+      if (email && !people.has(email)) people.set(email, String(row.usuario_nome || email));
+    });
+    const options = [...people.entries()].sort((a, b) => a[1].localeCompare(b[1], "pt-BR"));
+    $("gvAuditUser").innerHTML = '<option value="">Todos os usuários</option>' +
+      options.map(([email, name]) => `<option value="${esc(email)}">${esc(name)} · ${esc(email)}</option>`).join("");
+    if (people.has(current)) $("gvAuditUser").value = current;
+  }
+
+  function renderAuditReport() {
+    const accessRows = filteredAuditRows("accesses");
+    const changeRows = filteredAuditRows("changes");
+    $("gvAuditAccessCount").textContent = accessRows.length.toLocaleString("pt-BR");
+    $("gvAuditAccessUsers").textContent = new Set(accessRows.map(row => row.usuario_email).filter(Boolean)).size.toLocaleString("pt-BR");
+    $("gvAuditChangeCount").textContent = changeRows.length.toLocaleString("pt-BR");
+    $("gvAuditChangeUsers").textContent = new Set(changeRows.map(row => row.usuario_email).filter(Boolean)).size.toLocaleString("pt-BR");
+    $("gvAuditLimit").textContent = state.audit.truncated ? "Limite de 2.000 registros atingido." : "";
+    document.querySelectorAll("[data-audit-tab]").forEach(button => button.classList.toggle("is-active", button.dataset.auditTab === state.audit.activeTab));
+
+    const rows = state.audit.activeTab === "changes" ? changeRows : accessRows;
+    if (!rows.length) {
+      $("gvAuditTable").innerHTML = '<div class="gv-audit-empty">Nenhum registro encontrado para os filtros selecionados.</div>';
+      return;
+    }
+    if (state.audit.activeTab === "accesses") {
+      $("gvAuditTable").innerHTML = `<table class="gv-audit-table"><thead><tr><th>Data e hora</th><th>Usuário</th><th>E-mail</th><th>Evento</th><th>Quadro</th><th>Versão</th></tr></thead><tbody>${rows.map(row => `<tr>
+        <td>${esc(formatDateTime(row.criado_em))}</td>
+        <td>${esc(row.usuario_nome || "—")}</td>
+        <td>${esc(row.usuario_email || "—")}</td>
+        <td><span class="gv-audit-action">${esc(row.evento || "acesso")}</span></td>
+        <td>${esc(row.quadro_nome || "Sistema")}<small>${esc(row.quadro_id || "")}</small></td>
+        <td>${esc(row.build_id || "—")}</td>
+      </tr>`).join("")}</tbody></table>`;
+      return;
+    }
+    $("gvAuditTable").innerHTML = `<table class="gv-audit-table"><thead><tr><th>Data e hora</th><th>Usuário</th><th>Ação</th><th>Quadro</th><th>Item</th><th>Coluna</th><th>Valor anterior</th><th>Valor novo</th><th>Status</th></tr></thead><tbody>${rows.map(row => `<tr>
+      <td>${esc(formatDateTime(row.criado_em))}</td>
+      <td>${esc(row.usuario_nome || "—")}<small>${esc(row.usuario_email || "")}</small></td>
+      <td><span class="gv-audit-action">${esc(actionLabel(row.acao))}</span></td>
+      <td>${esc(row.quadro_nome || "—")}<small>${esc(row.quadro_id || "")}</small></td>
+      <td>${esc(row.item_nome || "—")}<small>${esc(row.item_id || "")}</small></td>
+      <td>${esc(row.coluna_nome || "—")}<small>${esc(row.coluna_id || "")}</small></td>
+      <td><span class="gv-audit-value" title="${esc(formatAuditValue(row.valor_anterior))}">${esc(formatAuditValue(row.valor_anterior))}</span></td>
+      <td><span class="gv-audit-value" title="${esc(formatAuditValue(row.valor_novo))}">${esc(formatAuditValue(row.valor_novo))}</span></td>
+      <td>${esc(row.status || "—")}</td>
+    </tr>`).join("")}</tbody></table>`;
+  }
+
+  async function loadAuditReport() {
+    setDefaultAuditPeriod();
+    const fromValue = $("gvAuditFrom").value;
+    const toValue = $("gvAuditTo").value;
+    if (!fromValue || !toValue) return toast("Informe o período do relatório.", true);
+    const button = $("gvAuditApply");
+    button.disabled = true;
+    button.textContent = "Carregando...";
+    $("gvAuditStatus").textContent = "Consultando registros de auditoria...";
+    try {
+      const payload = await call("audit_report", {
+        from: new Date(`${fromValue}T00:00:00`).toISOString(),
+        to: new Date(`${toValue}T23:59:59.999`).toISOString(),
+        limit: 2000
+      });
+      state.audit.accesses = Array.isArray(payload.accesses) ? payload.accesses : [];
+      state.audit.changes = Array.isArray(payload.changes) ? payload.changes : [];
+      state.audit.truncated = Boolean(payload.truncated);
+      state.audit.loaded = true;
+      renderAuditUsers();
+      renderAuditReport();
+      $("gvAuditStatus").textContent = `${(state.audit.accesses.length + state.audit.changes.length).toLocaleString("pt-BR")} registro(s) consultado(s).`;
+    } catch (error) {
+      console.error(error);
+      $("gvAuditStatus").textContent = error.message;
+      $("gvAuditTable").innerHTML = `<div class="gv-audit-empty">${esc(error.message)}</div>`;
+      toast(error.message, true);
+    } finally {
+      button.disabled = false;
+      button.textContent = "Atualizar relatório";
+    }
+  }
+
+  function openAuditReport() {
+    document.body.classList.add("gv-report-mode");
+    $("gvAuditView").hidden = false;
+    $("gvBoardTitle").textContent = "Relatórios de Auditoria";
+    $("gvBoardSubtitle").textContent = "Acessos e alterações registrados por usuário";
+    document.querySelectorAll("[data-board-target]").forEach(element => element.classList.remove("is-active"));
+    $("gvAuditReports").classList.add("is-active");
+    setDefaultAuditPeriod();
+    if (!state.audit.loaded) void loadAuditReport();
+  }
+
+  function closeAuditReport() {
+    document.body.classList.remove("gv-report-mode");
+    $("gvAuditView").hidden = true;
+    $("gvAuditReports").classList.remove("is-active");
+    if (state.board) {
+      $("gvBoardTitle").textContent = state.board.name;
+      const activeView = state.views.find(view => String(view.id) === state.activeViewId);
+      $("gvBoardSubtitle").textContent = activeView ? `Filtro salvo: ${activeView.name}` : "Edição interna das colunas do quadro";
+      document.querySelectorAll("[data-board-id]").forEach(element => element.classList.toggle("is-active", String(element.dataset.boardId) === String(state.board.id)));
+    }
+  }
+
+  function csvCell(value) {
+    let text = String(value ?? "");
+    if (/^[=+\-@]/.test(text)) text = `'${text}`;
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+
+  function exportAuditCsv() {
+    const rows = filteredAuditRows(state.audit.activeTab);
+    if (!rows.length) return toast("Não há registros para exportar.", true);
+    const access = state.audit.activeTab === "accesses";
+    const headers = access
+      ? ["Data e hora", "Usuário", "E-mail", "Evento", "Quadro", "Quadro ID", "Versão"]
+      : ["Data e hora", "Usuário", "E-mail", "Ação", "Quadro", "Quadro ID", "Item", "Item ID", "Coluna", "Coluna ID", "Valor anterior", "Valor novo", "Status"];
+    const data = rows.map(row => access
+      ? [formatDateTime(row.criado_em), row.usuario_nome, row.usuario_email, row.evento, row.quadro_nome, row.quadro_id, row.build_id]
+      : [formatDateTime(row.criado_em), row.usuario_nome, row.usuario_email, actionLabel(row.acao), row.quadro_nome, row.quadro_id, row.item_nome, row.item_id, row.coluna_nome, row.coluna_id, formatAuditValue(row.valor_anterior), formatAuditValue(row.valor_novo), row.status]);
+    const csv = "\ufeff" + [headers, ...data].map(line => line.map(csvCell).join(";")).join("\r\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `relatorio_${access ? "acessos" : "alteracoes"}_${$("gvAuditFrom").value}_${$("gvAuditTo").value}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function logAccessOnce() {
+    const key = "gv-audit-access-logged-v2";
+    if (sessionStorage.getItem(key)) return;
+    try {
+      const result = await call("log_access", {
+        event_type: "acesso_sistema",
+        board_id: ROOT_BOARD_ID,
+        board_name: state.board?.name || "Validação de Materiais",
+        page: `${location.pathname}${location.search}`,
+        build_id: window.APP_CONFIG.BUILD_ID
+      });
+      if (result.audit_saved) sessionStorage.setItem(key, "1");
+    } catch (error) {
+      console.error("Acesso não registrado", error);
+    }
+  }
+
   function bindInteractions() {
+    $("gvAuditReports").addEventListener("click", openAuditReport);
+    $("gvAuditBack").addEventListener("click", closeAuditReport);
+    $("gvAuditApply").addEventListener("click", loadAuditReport);
+    $("gvAuditExport").addEventListener("click", exportAuditCsv);
+    ["gvAuditUser", "gvAuditAction"].forEach(id => $(id).addEventListener("change", renderAuditReport));
+    document.querySelectorAll("[data-audit-tab]").forEach(button => button.addEventListener("click", () => {
+      state.audit.activeTab = button.dataset.auditTab;
+      $("gvAuditAction").disabled = state.audit.activeTab !== "changes";
+      renderAuditReport();
+    }));
     ["gvBusca", "gvGlobalBusca"].forEach(id => $(id).addEventListener("input", event => {
       const other = id === "gvBusca" ? $("gvGlobalBusca") : $("gvBusca");
       other.value = event.target.value;
@@ -910,6 +1120,7 @@
     document.querySelectorAll("[data-board-target]").forEach(element => element.addEventListener("click", () => {
       const boardId = element.dataset.boardId;
       if (!boardId) return toast(`“${element.dataset.boardTarget}” não apareceu como quadro acessível na API. Verifique se é painel/pasta, o nome real ou a permissão do token.`, true);
+      closeAuditReport();
       loadBoard(boardId, null, "");
     }));
     document.querySelectorAll("[data-section-toggle]").forEach(section => section.addEventListener("click", () => {
@@ -982,10 +1193,10 @@
       if ($("gvCellDialog").open) { $("gvCellDialog").close(); state.cell = null; }
     });
 
-    document.querySelectorAll([".gv-global-actions button", ".gv-side-icon", ".gv-boardnav button", ".gv-nav-item:not([data-board-target])", ".gv-star", ".gv-board-actions > button:not(.gv-logout)"].join(","))
+    document.querySelectorAll([".gv-global-actions button", ".gv-side-icon", ".gv-boardnav button", ".gv-nav-item:not([data-board-target]):not(#gvAuditReports)", ".gv-star", ".gv-board-actions > button:not(.gv-logout)"].join(","))
       .forEach(button => button.addEventListener("click", () => toast(`${button.title || button.textContent.trim() || "Opção"}: este é um produto do portal Monday, não uma função de quadro disponível pela integração.`, true)));
     window.GV_APP_READY = true;
-    $("gvControlsStatus").textContent = "V2.3.1 · abertura rápida ativa";
+    $("gvControlsStatus").textContent = "V2.4 · auditoria ativa";
   }
 
   async function start() {
@@ -1000,6 +1211,7 @@
       return toast(error.message, true);
     }
     if (!user) return;
+    void logAccessOnce();
 
     const name = document.querySelector("[data-user-name]")?.textContent || user.email || "U";
     const parts = String(name).trim().split(/\s+/).filter(Boolean);

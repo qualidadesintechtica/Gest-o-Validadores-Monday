@@ -1,7 +1,7 @@
-# Primeiro teste controlado da V2.3.1
+# Primeiro teste controlado da V2.4
 
 1. Abra o sistema e faça login.
-2. Confirme a mensagem `V2.3.1 · abertura rápida ativa`.
+2. Confirme a mensagem `V2.4 · auditoria ativa`.
 3. Abra um quadro de teste e clique em `Criar título`.
 4. Informe um nome identificável, selecione o grupo e confirme a criação.
 5. Confirme que o título aparece no quadro principal e no Monday.
@@ -24,7 +24,12 @@
 17. Clique na célula, altere um único valor e confirme a gravação.
 18. Atualize o item no Monday e confira o novo valor.
 19. Volte ao sistema, clique em `Atualizar dados do Monday` e confira a célula.
-20. Repita a navegação nos outros quadros antes de liberar o uso geral.
+20. Abra `Relatórios de auditoria`, selecione o dia atual e confirme que o seu
+    acesso e a alteração aparecem com usuário, data e quadro.
+21. Abra a aba `Alterações` e confira item, coluna, valor anterior, valor novo e
+    status.
+22. Exporte o relatório em CSV e confirme que o arquivo abre corretamente.
+23. Repita a navegação nos outros quadros antes de liberar o uso geral.
 
 Campos marcados como `somente leitura` são calculados ou bloqueados pela API do
 Monday e não devem abrir o editor.
